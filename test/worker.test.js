@@ -124,10 +124,12 @@ test('pairing: new, open, done, poll', async () => {
   assert.match(id, /^[a-z0-9]{10}$/);
   assert.equal(url, `${ORIGIN}/pair/${id}`);
 
-  // The QR link sends the browser to the hub with a matching PKCE challenge.
+  // The QR link forwards the browser to the hub with a matching PKCE challenge.
   const open = await call('GET', `/pair/${id}`);
-  assert.equal(open.status, 302);
-  const authorize = new URL(open.headers.get('location'));
+  assert.equal(open.status, 200);
+  const forward = /http-equiv="refresh" content="0;url=([^"]+)"/.exec(open.body)[1].replaceAll('&#38;', '&');
+  assert.ok(open.body.includes(`<a href="${forward.replaceAll('&', '&#38;')}">`));
+  const authorize = new URL(forward);
   assert.equal(authorize.origin + authorize.pathname, 'https://auth.lost.plus/oauth/authorize');
   assert.equal(authorize.searchParams.get('resource'), `${ORIGIN}/mcp`);
   assert.equal(authorize.searchParams.get('scope'), 'today');

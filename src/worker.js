@@ -283,7 +283,9 @@ async function livePair(env, id) {
 async function pairOpen(request, env, id) {
   const row = await livePair(env, id);
   if (!row || row.code) return page(request, 410, 'expired');
-  return new Response(null, { status: 302, headers: { location: row.authorize_url, 'cache-control': 'no-store' } });
+  // A page that forwards the browser, not a 302: the gateway follows a
+  // backend's redirects itself, so a 302 here would never reach the phone.
+  return page(request, 200, 'continue', row.authorize_url);
 }
 
 async function pairDone(request, env, url) {
@@ -322,6 +324,10 @@ function json(status, value) {
 }
 
 const PAGES = {
+  continue: {
+    en: ['Connect your watch', 'Taking you to lost.plus to sign in…', 'Continue'],
+    ko: ['워치 연결하기', 'lost.plus 로그인으로 넘어가는 중이에요…', '계속'],
+  },
   paired: {
     en: ['Watch connected', 'Your schedule is on its way to your wrist. You can close this tab.'],
     ko: ['워치와 연결됐어요', '곧 손목에 시간표가 떠요. 이 탭은 닫아도 돼요.'],
@@ -336,13 +342,14 @@ const PAGES = {
   },
 };
 
-/** A small standalone page for the pairing browser tab. */
-function page(request, status, key) {
+/** A small standalone page for the pairing browser tab, optionally forwarding to `next`. */
+function page(request, status, key, next) {
   const lang = (request.headers.get('accept-language') ?? '').toLowerCase().startsWith('ko') ? 'ko' : 'en';
-  const [title, body] = PAGES[key][lang];
+  const [title, body, action] = PAGES[key][lang];
+  const href = next ? escapeHtml(next) : '';
   const html = `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="color-scheme" content="light dark"><title>${title} · today</title>
+<meta name="color-scheme" content="light dark"><title>${title} · today</title>${next ? `<meta http-equiv="refresh" content="0;url=${href}">` : ''}
 <style>
 :root{color-scheme:light dark;--bg:#f7f7f5;--text:#1a1a1a;--muted:#555c64;--accent:#2f55e8}
 @media (prefers-color-scheme:dark){:root{--bg:#151619;--text:#e8eaed;--muted:#afb5bd;--accent:#93a6ff}}
@@ -350,7 +357,8 @@ body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--
 font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Apple SD Gothic Neo",Pretendard,sans-serif}
 main{max-width:22rem;padding:24px}h1{margin:0 0 6px;font-size:20px;font-weight:650}p{margin:0;color:var(--muted)}
 b{display:block;margin-bottom:18px;color:var(--accent);font-size:13px;font-weight:600}
-</style></head><body><main><b>today</b><h1>${title}</h1><p>${body}</p></main></body></html>`;
+a{display:inline-block;margin-top:18px;padding:8px 16px;border-radius:8px;background:var(--accent);color:#fff;font-weight:600;text-decoration:none}
+</style></head><body><main><b>today</b><h1>${title}</h1><p>${body}</p>${next ? `<a href="${href}">${action}</a>` : ''}</main></body></html>`;
   return new Response(html, {
     status,
     headers: {
@@ -361,6 +369,10 @@ b{display:block;margin-bottom:18px;color:var(--accent);font-size:13px;font-weigh
       'referrer-policy': 'no-referrer',
     },
   });
+}
+
+function escapeHtml(text) {
+  return text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
 function base64url(bytes) {
