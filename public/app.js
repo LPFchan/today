@@ -31,7 +31,10 @@ const el = {
   startButton: $('#startButton'),
   clearButton: $('#clearButton'),
   visibilityHint: $('#visibilityHint'),
-  alertToggle: $('#alertToggle'),
+  previewGuide: $('#previewGuide'),
+  previewList: $('#previewList'),
+  previewTotal: $('#previewTotal'),
+  alertButton: $('#alertButton'),
   shiftDialog: $('#shiftDialog'),
   shiftBody: $('#shiftBody'),
   keepTimes: $('#keepTimes'),
@@ -201,7 +204,7 @@ function renderVisibility() {
   el.visibilityPill.dataset.visibility = state.visibility;
   el.visibilityPill.textContent = t(state.visibility);
   el.visibilityPill.title = t(state.visibility === 'public' ? 'publicHint' : 'privateHint');
-  el.visibilityHint.textContent = t(state.visibility === 'public' ? 'publicHint' : 'privateHint');
+  el.visibilityHint.textContent = t(`visibilityShort_${state.visibility}`);
   for (const radio of el.editorForm.elements.visibility) radio.checked = radio.value === state.visibility;
 }
 
@@ -452,10 +455,13 @@ function scheduleMessage(code, line) {
 }
 
 function showError(message) {
+  if (!el.editor.open) openEditor();
+  el.previewGuide.hidden = true;
+  el.previewList.hidden = true;
+  el.previewTotal.hidden = true;
   el.planError.textContent = message;
   el.planError.hidden = false;
   el.planInput.setAttribute('aria-invalid', 'true');
-  if (!el.editor.open) openEditor();
   el.planInput.focus();
 }
 
@@ -464,13 +470,72 @@ function clearError() {
   el.planInput.removeAttribute('aria-invalid');
 }
 
+function duration(minutes) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  if (!h) return t('durationMinutes', { m });
+  return m ? t('duration', { h, m }) : t('durationHours', { h });
+}
+
+/** Show what the text in the editor turns into, or the format guide when it is blank. */
+function renderPreview() {
+  const text = el.planInput.value;
+  clearError();
+  el.previewList.hidden = true;
+  el.previewTotal.hidden = true;
+  el.previewGuide.hidden = Boolean(text.trim());
+  if (!text.trim()) return;
+
+  let items;
+  try {
+    items = parseSchedule(text);
+  } catch (error) {
+    if (!(error instanceof ScheduleError)) throw error;
+    el.planError.textContent = scheduleMessage(error.code, error.line);
+    el.planError.hidden = false;
+    el.planInput.setAttribute('aria-invalid', 'true');
+    return;
+  }
+  if (!items.length) {
+    el.previewGuide.hidden = false;
+    return;
+  }
+  el.previewList.replaceChildren(
+    ...items.map((item) => {
+      const li = document.createElement('li');
+      li.append(
+        Object.assign(document.createElement('span'), {
+          className: 'preview-time',
+          textContent: `${formatClock(item.start)}–${formatClock(item.end)}`,
+        }),
+        Object.assign(document.createElement('span'), { className: 'preview-name', textContent: item.name }),
+        Object.assign(document.createElement('span'), { className: 'preview-length', textContent: duration(item.end - item.start) }),
+      );
+      return li;
+    }),
+  );
+  el.previewTotal.textContent = t('previewTotal', {
+    count: items.length,
+    from: formatClock(items[0].start),
+    to: formatClock(items.at(-1).end),
+  });
+  el.previewList.hidden = false;
+  el.previewTotal.hidden = false;
+}
+
 function openEditor() {
   if (el.editor.open) return;
   el.planInput.value = loadDraft() ?? state.schedule?.text ?? '';
-  el.alertToggle.checked = state.alert;
+  const running = anchorForEdit(Date.now()) === state.schedule?.anchor;
+  el.startButton.textContent = t(running ? 'save' : 'start');
   renderVisibility();
+  renderPreview();
   el.editor.showModal();
   requestAnimationFrame(() => el.planInput.focus());
+}
+
+function renderAlert() {
+  el.alertButton.setAttribute('aria-pressed', String(state.alert));
 }
 
 /** The anchor to count a new plan from: keep a plan that is still running, else today. */
@@ -653,7 +718,7 @@ el.editorForm.addEventListener('submit', (event) => {
   requestStart(el.planInput.value);
 });
 el.planInput.addEventListener('input', () => {
-  clearError();
+  renderPreview();
   saveDraft(el.planInput.value);
 });
 el.planInput.addEventListener('keydown', (event) => {
@@ -665,11 +730,12 @@ el.planInput.addEventListener('keydown', (event) => {
 el.clearButton.addEventListener('click', clearPlan);
 el.editorForm.addEventListener('change', (event) => {
   if (event.target.name === 'visibility') setVisibility(event.target.value);
-  if (event.target === el.alertToggle) {
-    state.alert = el.alertToggle.checked;
-    localStorage.setItem('today.alert', String(state.alert));
-    if (state.alert) unlockAudio();
-  }
+});
+el.alertButton.addEventListener('click', () => {
+  state.alert = !state.alert;
+  localStorage.setItem('today.alert', String(state.alert));
+  renderAlert();
+  if (state.alert) unlockAudio();
 });
 
 el.keepTimes.addEventListener('click', () => {
@@ -729,5 +795,6 @@ setInterval(() => {
 }, BOARD_REFRESH_MS);
 
 translatePage();
+renderAlert();
 setView(state.view);
 loadProfile().catch((error) => showToast(error.message));

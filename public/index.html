@@ -27,6 +27,10 @@
         <button class="icon-button" id="fullscreenButton" type="button" data-t-label="fullscreen" data-t-title="fullscreen">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
         </button>
+        <button class="icon-button" id="alertButton" type="button" aria-pressed="true" data-t-label="alert" data-t-title="alert">
+          <svg class="bell-on" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
+          <svg class="bell-off" aria-hidden="true" viewBox="0 0 24 24"><path d="M8.5 5.6A6 6 0 0 1 18 11v4M6 11v5l-1.5 2H17M10 20.5a2.2 2.2 0 0 0 4 0M4 4l16 16" /></svg>
+        </button>
         <button class="icon-button" id="watchButton" type="button" data-t-label="watch" data-t-title="watch">
           <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 9.5V12l1.5 1" /></svg>
         </button>
@@ -94,34 +98,39 @@
           </button>
         </div>
 
-        <label class="sr-only" for="planInput" data-t="editorLabel">Plan</label>
-        <textarea id="planInput" rows="10" spellcheck="false" autocomplete="off" aria-describedby="planHint planError" data-t-placeholder="editorPlaceholder"></textarea>
-        <p class="field-error" id="planError" role="alert" hidden></p>
-        <p class="field-hint" id="planHint" data-t="editorHint"></p>
-
-        <div class="sheet-actions">
-          <button class="btn primary" id="startButton" type="submit" data-t="start">Start</button>
-          <button class="btn quiet danger" id="clearButton" type="button" data-t="clear">Clear</button>
+        <div class="composer">
+          <label class="sr-only" for="planInput" data-t="editorLabel">Plan</label>
+          <textarea id="planInput" rows="12" spellcheck="false" autocomplete="off" aria-describedby="planError" data-t-placeholder="editorPlaceholder"></textarea>
+          <section class="preview" aria-labelledby="previewTitle">
+            <h3 class="section-label" id="previewTitle" data-t="preview">Preview</h3>
+            <div class="preview-guide" id="previewGuide">
+              <p data-t="guideLead"></p>
+              <dl>
+                <dt><code>09:00-10:30 Deep work</code></dt>
+                <dd data-t="guideRange"></dd>
+                <dt><code>10:30 Email</code></dt>
+                <dd data-t="guideOpen"></dd>
+                <dt><code># …</code></dt>
+                <dd data-t="guideNote"></dd>
+              </dl>
+            </div>
+            <ol class="preview-list" id="previewList" hidden></ol>
+            <p class="preview-total" id="previewTotal" hidden></p>
+            <p class="field-error" id="planError" aria-live="polite" hidden></p>
+          </section>
         </div>
 
-        <fieldset class="setting">
-          <legend data-t="visibility">Who can see this</legend>
-          <div class="segmented">
-            <label><input type="radio" name="visibility" value="public" /><span data-t="public">Public</span></label>
-            <label><input type="radio" name="visibility" value="private" /><span data-t="private">Private</span></label>
+        <div class="sheet-foot">
+          <div class="segmented" role="radiogroup" data-t-label="visibility">
+            <label data-t-title="publicHint"><input type="radio" name="visibility" value="public" /><span data-t="public">Public</span></label>
+            <label data-t-title="privateHint"><input type="radio" name="visibility" value="private" /><span data-t="private">Private</span></label>
           </div>
-          <p class="field-hint" id="visibilityHint"></p>
-        </fieldset>
-
-        <label class="setting switch-row" for="alertToggle">
-          <span>
-            <strong data-t="alert">Alert when an item ends</strong>
-            <small data-t="alertHint"></small>
-          </span>
-          <input id="alertToggle" type="checkbox" role="switch" />
-        </label>
-
-        <p class="sheet-foot"><span data-t="shortcuts"></span> · <span id="draftStatus" data-t="draftSaved"></span></p>
+          <span class="foot-hint" id="visibilityHint"></span>
+          <div class="foot-actions">
+            <button class="btn quiet danger" id="clearButton" type="button" data-t="clear">Clear</button>
+            <button class="btn primary" id="startButton" type="submit" data-t="start">Start</button>
+          </div>
+        </div>
       </form>
     </dialog>
 
