@@ -7,7 +7,7 @@
 - Current focus: first real use by the operator and marie
 - Highest-priority blocker: none
 - Next operator decision needed: none
-- Related decisions: DEC-20260923-001
+- Related decisions: DEC-20260923-001, DEC-20260923-002
 
 ## Current State Summary
 
@@ -27,12 +27,14 @@ pairing needs a real account to approve it.
 - Status: `in progress`
 - Current work: first sign-ins; first real watch pairing.
 - Exit criteria: both have paired a watch and shared their day publicly.
-- Risks: Hangul on the watch needs a firmware with Korean glyphs (PebbleOAO
-  has them; stock firmware needs a language pack).
 - Related ids: DEC-20260923-001
 
 ## Recent Changes To Project Reality
 
+- 2026-09-23:
+  - Change: the cloud gateway passes backend redirects through, so the pairing link is a plain 302 again.
+  - Why it matters: one less workaround; coverse's sign-in cookie survives too.
+  - Related ids: DEC-20260923-002
 - 2026-09-23:
   - Change: first deploy; gateway routes and hub row added in LPFchan/auth.
   - Why it matters: the service exists.
@@ -40,11 +42,11 @@ pairing needs a real account to approve it.
 
 ## Active Blockers And Risks
 
-- The cloud gateway follows backend redirects instead of passing them on.
-  - Effect: a service cannot 302 the browser elsewhere through the gateway.
-  - Owner: LPFchan/auth
-  - Mitigation: today forwards with an HTML page instead.
-  - Related ids: DEC-20260923-001
+- Hangul on the watch.
+  - Effect: Korean names show as boxes on stock firmware without a language pack.
+  - Owner: operator
+  - Mitigation: PebbleOAO carries Korean glyphs.
+  - Related ids: none
 
 ## Immediate Next Steps
 
