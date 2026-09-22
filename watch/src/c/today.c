@@ -45,15 +45,14 @@ static int s_last_completed = -1;
 
 static bool s_korean;
 
-typedef enum { S_NOW, S_STARTS, S_BREAK, S_NEXT, S_DONE, S_EMPTY, S_EMPTY_HINT, S_CONNECTING, S_SCAN, S_OFFLINE } StringId;
+typedef enum { S_STARTS, S_BREAK, S_NEXT, S_DONE, S_EMPTY, S_EMPTY_HINT, S_CONNECTING, S_SCAN, S_OFFLINE } StringId;
 
 static const char *const EN[] = {
-    "Now", "Starts %s", "Break \xc2\xb7 next %s", "Next %s %s", "Done for today", "No plan today",
+    "Starts %s", "Break \xc2\xb7 next %s", "Next %s %s", "Done for today", "No plan today",
     "Write one at today.lost.plus", "Connecting to your phone\xe2\x80\xa6", "Scan with your phone",
     "Can't reach your phone",
 };
 static const char *const KO[] = {
-    "\xec\xa7\x80\xea\xb8\x88",  // 지금
     "%s \xec\x8b\x9c\xec\x9e\x91",  // %s 시작
     "\xec\x89\xac\xeb\x8a\x94 \xec\x8b\x9c\xea\xb0\x84 \xc2\xb7 %s",  // 쉬는 시간 · %s
     "\xeb\x8b\xa4\xec\x9d\x8c %s %s",  // 다음 %s %s
@@ -161,6 +160,19 @@ static int draw_text(GContext *ctx, const char *text, GFont font, GRect box, GCo
   return box.size.h;
 }
 
+static int clock_top(GRect bounds) { return PBL_IF_ROUND_ELSE(big_screen(bounds) ? 16 : 10, 0); }
+
+static int clock_bottom(GRect bounds) { return clock_top(bounds) + (big_screen(bounds) ? 22 : 18); }
+
+/** The time of day at the top, the size of the "next" line but bold. */
+static void draw_clock(GContext *ctx, GRect bounds) {
+  char text[8];
+  format_clock(time(NULL), text, sizeof(text));
+  GFont font = fonts_get_system_font(big_screen(bounds) ? FONT_KEY_GOTHIC_18_BOLD : FONT_KEY_GOTHIC_14_BOLD);
+  draw_text(ctx, text, font, GRect(0, clock_top(bounds), bounds.size.w, clock_bottom(bounds) - clock_top(bounds)),
+            GColorBlack);
+}
+
 static void draw_message(GContext *ctx, GRect bounds, const char *title, const char *hint) {
   bool big = big_screen(bounds);
   GFont title_font = fonts_get_system_font(big ? FONT_KEY_GOTHIC_28_BOLD : FONT_KEY_GOTHIC_24_BOLD);
@@ -214,10 +226,9 @@ static void draw_timer(GContext *ctx, GRect bounds, DayState state, time_t now) 
 
   Item *item = &s_items[state.index];
   char kicker[48], timer[16], clock_text[8], next[NAME_BYTES + 24];
-  next[0] = '\0';
+  kicker[0] = next[0] = '\0';
   int seconds;
   if (state.kind == K_ACTIVE) {
-    snprintf(kicker, sizeof(kicker), "%s", str(S_NOW));
     seconds = item->end - now;
     if (state.index + 1 < s_count) {
       format_clock(s_items[state.index + 1].start, clock_text, sizeof(clock_text));
@@ -248,13 +259,21 @@ static void draw_timer(GContext *ctx, GRect bounds, DayState state, time_t now) 
   GSize name_size = graphics_text_layout_get_content_size(item->name, name_font, name_box,
                                                           GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter);
   if (name_size.h > name_box.size.h) name_size.h = name_box.size.h;
+  int kicker_h = kicker[0] ? (big ? 28 : 22) : 0;
   int name_y = timer_y - name_size.h - (big ? 8 : 6);
+  // Out of room under the clock: keep the name to one line.
+  if (name_y - kicker_h < clock_bottom(bounds) + 2) {
+    GSize line = graphics_text_layout_get_content_size("M", name_font, name_box, GTextOverflowModeTrailingEllipsis,
+                                                       GTextAlignmentCenter);
+    if (name_size.h > line.h) name_size.h = line.h;
+    name_y = timer_y - name_size.h - (big ? 8 : 6);
+  }
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, item->name, name_font, GRect(inner.origin.x, name_y, inner.size.w, name_size.h + 4),
                      GTextOverflowModeTrailingEllipsis, GTextAlignmentCenter, NULL);
-  int kicker_h = big ? 28 : 22;
-  draw_text(ctx, kicker, kicker_font, GRect(inner.origin.x, name_y - kicker_h, inner.size.w, kicker_h),
-            state.kind == K_ACTIVE ? accent() : muted());
+  if (kicker[0]) {
+    draw_text(ctx, kicker, kicker_font, GRect(inner.origin.x, name_y - kicker_h, inner.size.w, kicker_h), muted());
+  }
 
   graphics_context_set_text_color(ctx, GColorBlack);
   graphics_draw_text(ctx, timer, timer_font, GRect(0, timer_y - (big ? 6 : 5), bounds.size.w, timer_size.h + 8),
@@ -291,6 +310,7 @@ static void canvas_update(Layer *layer, GContext *ctx) {
     draw_qr(ctx, bounds);
     return;
   }
+  draw_clock(ctx, bounds);
   if (!s_have_items) {
     draw_message(ctx, bounds, str(s_status == STATUS_OFFLINE ? S_OFFLINE : S_CONNECTING), NULL);
     return;
