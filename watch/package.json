@@ -1,0 +1,31 @@
+{
+  "name": "today",
+  "author": "LPFchan",
+  "version": "1.0.0",
+  "keywords": ["pebble-app"],
+  "private": true,
+  "dependencies": {
+    "qrcode-generator": "^2.0.4"
+  },
+  "pebble": {
+    "displayName": "today",
+    "uuid": "e8461573-828b-4959-b69a-5a3abd6a0d62",
+    "sdkVersion": "3",
+    "enableMultiJS": true,
+    "targetPlatforms": ["aplite", "basalt", "chalk", "diorite", "emery", "flint", "gabbro"],
+    "watchapp": {
+      "watchface": false
+    },
+    "messageKeys": ["Count", "Index", "Start", "End", "Name", "Qr", "QrSize", "Status", "Refresh", "Unpair"],
+    "resources": {
+      "media": [
+        {
+          "type": "bitmap",
+          "name": "MENU_ICON",
+          "file": "images/menu-icon.png",
+          "menuIcon": true
+        }
+      ]
+    }
+  }
+}

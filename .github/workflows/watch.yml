@@ -1,0 +1,52 @@
+# Builds the Pebble app. A push that touches watch/ checks that it builds;
+# a `watch-v*` tag also publishes today.pbw on a GitHub release, which is
+# where the web app's "download the watch app" link points.
+name: watch
+
+on:
+  push:
+    branches: [main]
+    paths: ['watch/**', '.github/workflows/watch.yml']
+    tags: ['watch-v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@v6
+      - name: Cache the Pebble SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.local/share/pebble-sdk
+            ~/.pebble-sdk
+          key: pebble-sdk-4.33.1
+      - name: Install the Pebble SDK
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libsdl2-2.0-0 libglib2.0-0 libpixman-1-0 zlib1g
+          uv tool install pebble-tool --python 3.13
+          yes | pebble sdk install 4.33.1 || pebble sdk activate 4.33.1
+      - name: Build
+        working-directory: watch
+        run: |
+          pebble build
+          cp build/watch.pbw ../today.pbw
+      - uses: actions/upload-artifact@v4
+        with:
+          name: today.pbw
+          path: today.pbw
+          if-no-files-found: error
+      - name: Publish
+        if: startsWith(github.ref, 'refs/tags/watch-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" today.pbw --title "Watch app ${GITHUB_REF_NAME#watch-v}" --notes "Install today.pbw with the Pebble app on your phone." --latest
