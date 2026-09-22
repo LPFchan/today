@@ -1,0 +1,22 @@
+{
+  "name": "today",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "wrangler dev --config wrangler.jsonc",
+    "dev:gateway": "node scripts/dev-gateway.mjs",
+    "test": "node --test test/*.test.js",
+    "migrate": "wrangler d1 migrations apply today --remote --config wrangler.jsonc",
+    "deploy": "wrangler deploy --config wrangler.jsonc"
+  },
+  "dependencies": {
+    "@lpfchan/gateway-identity": "^1.0.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.136.3"
+  }
+}

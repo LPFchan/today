@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
+    <title>today</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#timer" data-t="skip">Skip to timer</a>
+
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="today">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+        <span>today</span>
+      </a>
+      <nav class="tabs" data-t-label="views" aria-label="Views">
+        <a href="/" id="tabMine" data-t="tabMine">Mine</a>
+        <a href="/everyone" id="tabEveryone" data-t="tabEveryone">Everyone</a>
+      </nav>
+      <div class="top-actions">
+        <button class="icon-button" id="fullscreenButton" type="button" data-t-label="fullscreen" data-t-title="fullscreen">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M8 3H3v5M16 3h5v5M8 21H3v-5M16 21h5v-5" /></svg>
+        </button>
+        <button class="icon-button" id="watchButton" type="button" data-t-label="watch" data-t-title="watch">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 9.5V12l1.5 1" /></svg>
+        </button>
+        <details class="account" id="account">
+          <summary class="avatar" data-t-label="account" id="avatar"></summary>
+          <div class="menu">
+            <p class="menu-name" id="accountName"></p>
+            <p class="menu-meta" id="accountEmail"></p>
+            <a class="menu-item" href="/_auth/logout" data-t="signOut">Sign out</a>
+          </div>
+        </details>
+      </div>
+    </header>
+
+    <main>
+      <section class="view view-mine" id="viewMine" aria-labelledby="taskName">
+        <div class="focus" id="focus">
+          <p class="status-line">
+            <span id="dateLabel"></span>
+            <button class="visibility-pill" id="visibilityPill" type="button"></button>
+          </p>
+          <p class="kicker-line" id="kickerLine"></p>
+          <h1 class="task-name" id="taskName"></h1>
+          <time class="timer" id="timer" aria-live="off"><span aria-hidden="true">00:00</span></time>
+          <p class="next-line" id="nextLine"></p>
+          <div class="day-progress" id="dayProgress">
+            <div class="progress-track" id="progressTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <span class="progress-text"><span data-t="dayProgress">Day</span> <output id="progressText">0%</output></span>
+          </div>
+          <div class="focus-empty" id="focusEmpty" hidden>
+            <p data-t="emptyBody"></p>
+            <button class="btn primary" id="writeButton" type="button" data-t="write">Write a plan</button>
+          </div>
+        </div>
+
+        <section class="agenda" id="agendaSection" aria-labelledby="agendaTitle" hidden>
+          <div class="agenda-head">
+            <h2 class="section-label" id="agendaTitle" data-t="today">Today</h2>
+            <button class="btn quiet" id="editButton" type="button">
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" /></svg>
+              <span data-t="edit">Edit</span>
+            </button>
+          </div>
+          <ol class="agenda-list" id="agendaList"></ol>
+        </section>
+      </section>
+
+      <section class="view view-everyone" id="viewEveryone" aria-labelledby="everyoneTitle" hidden>
+        <div class="page-head">
+          <h1 id="everyoneTitle" data-t="everyoneTitle">Everyone’s day</h1>
+          <p data-t="everyoneBody"></p>
+        </div>
+        <div class="board" id="board"></div>
+      </section>
+    </main>
+
+    <dialog class="sheet" id="editor" aria-labelledby="editorTitle">
+      <form id="editorForm" method="dialog" novalidate>
+        <div class="sheet-head">
+          <h2 id="editorTitle" data-t="editorTitle">Today’s plan</h2>
+          <button class="icon-button" type="button" id="closeEditor" data-t-label="close">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+        </div>
+
+        <label class="sr-only" for="planInput" data-t="editorLabel">Plan</label>
+        <textarea id="planInput" rows="10" spellcheck="false" autocomplete="off" aria-describedby="planHint planError" data-t-placeholder="editorPlaceholder"></textarea>
+        <p class="field-error" id="planError" role="alert" hidden></p>
+        <p class="field-hint" id="planHint" data-t="editorHint"></p>
+
+        <div class="sheet-actions">
+          <button class="btn primary" id="startButton" type="submit" data-t="start">Start</button>
+          <button class="btn quiet danger" id="clearButton" type="button" data-t="clear">Clear</button>
+        </div>
+
+        <fieldset class="setting">
+          <legend data-t="visibility">Who can see this</legend>
+          <div class="segmented">
+            <label><input type="radio" name="visibility" value="public" /><span data-t="public">Public</span></label>
+            <label><input type="radio" name="visibility" value="private" /><span data-t="private">Private</span></label>
+          </div>
+          <p class="field-hint" id="visibilityHint"></p>
+        </fieldset>
+
+        <label class="setting switch-row" for="alertToggle">
+          <span>
+            <strong data-t="alert">Alert when an item ends</strong>
+            <small data-t="alertHint"></small>
+          </span>
+          <input id="alertToggle" type="checkbox" role="switch" />
+        </label>
+
+        <p class="sheet-foot"><span data-t="shortcuts"></span> · <span id="draftStatus" data-t="draftSaved"></span></p>
+      </form>
+    </dialog>
+
+    <dialog class="modal" id="shiftDialog" aria-labelledby="shiftTitle" aria-describedby="shiftBody">
+      <p class="kicker" data-t="shiftKicker"></p>
+      <h2 id="shiftTitle" data-t="shiftTitle"></h2>
+      <p id="shiftBody"></p>
+      <div class="modal-actions">
+        <button class="btn primary" id="keepTimes" type="button" data-t="keepTimes" autofocus></button>
+        <button class="btn" id="shiftToNow" type="button" data-t="shiftToNow"></button>
+      </div>
+    </dialog>
+
+    <dialog class="modal" id="watchDialog" aria-labelledby="watchTitle">
+      <div class="sheet-head">
+        <h2 id="watchTitle" data-t="watchTitle"></h2>
+        <button class="icon-button" type="button" id="closeWatch" data-t-label="close">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
+        </button>
+      </div>
+      <p data-t="watchBody"></p>
+      <ol class="steps">
+        <li data-t="watchStep1"></li>
+        <li data-t="watchStep2"></li>
+        <li data-t="watchStep3"></li>
+      </ol>
+      <a class="btn primary" href="https://github.com/LPFchan/today/releases/latest/download/today.pbw" data-t="watchDownload"></a>
+      <p class="field-hint" data-t="watchUnpair"></p>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>
