@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>today</title>
+    <link>https://raw.githubusercontent.com/LPFchan/today/mac-appcast/appcast.xml</link>
+    <language>en</language>
+    <item>
+      <title>Version 1.0.0</title>
+      <pubDate>Wed, 23 Sep 2026 09:37:32 GMT</pubDate>
+      <sparkle:version>9</sparkle:version>
+      <sparkle:shortVersionString>1.0.0</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/LPFchan/today/releases/tag/mac-v1.0.0</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/LPFchan/today/releases/download/mac-v1.0.0/today.dmg" type="application/octet-stream" sparkle:edSignature="HdDltexWMHwvdBnEuhZ1EZiAmKyoMVfWlqApyevLsWnxZS/tAkUf4HAJqNJohs4e3Z7XQzIa/Ee2dptWte/4AQ==" length="2491927"/>
+    </item>
+  </channel>
+</rss>
