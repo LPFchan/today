@@ -1,7 +1,7 @@
 import AppKit
 import SwiftUI
 
-/// First-launch wizard: what today does, signing in, whose timer to show,
+/// First-launch wizard: what Today does, signing in, whose timer to show,
 /// and where to find it afterwards.
 @Observable
 final class Onboarding {
@@ -138,7 +138,7 @@ private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 26) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 84, height: 84)
-            Header(title: "Welcome to today", subtitle: "Your plan’s timer, right in the menu bar.")
+            Header(title: "Welcome to Today", subtitle: "Your plan’s timer, right in the menu bar.")
             VStack(spacing: 14) {
                 TimerPreview()
                 Note("Or a friend’s, when they share their day.")
@@ -224,7 +224,7 @@ private struct SignInStep: View {
         VStack(spacing: 26) {
             Symbol("person.crop.circle.badge.checkmark")
             Header(title: "Sign in to lost.plus",
-                   subtitle: "today reads your plan, and the plans friends share, from your lost.plus account. It can’t change anything.")
+                   subtitle: "Today reads your plan, and the plans friends share, from your lost.plus account. It can’t change anything.")
             Group {
                 switch model.session {
                 case .signedIn:
@@ -334,13 +334,13 @@ private struct DoneStep: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(.secondary.opacity(0.15), in: .rect(cornerRadius: 6))
-                Text("today lives in the menu bar. Click it to see the rest of the day or switch people.")
+                Text("Today lives in the menu bar. Click it to see the rest of the day or switch people.")
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: 440)
-            Toggle("Open today when I log in", isOn: $openAtLogin)
+            Toggle("Open Today when I log in", isOn: $openAtLogin)
                 .toggleStyle(.switch)
                 .tint(accent)
                 .font(.system(size: 14, weight: .medium))

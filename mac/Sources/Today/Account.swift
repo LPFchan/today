@@ -83,7 +83,7 @@ enum Account {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "client_name": "today for Mac",
+            "client_name": "Today for Mac",
             "redirect_uris": [redirect],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
@@ -305,7 +305,7 @@ final class LoopbackServer: @unchecked Sendable {
             for item in url?.queryItems ?? [] { query[item.name] = item.value ?? "" }
             let ok = query["code"] != nil
             self.respond(connection, status: "200 OK", body: ok
-                ? ("Signed in", "today is in your menu bar now. You can close this tab.")
+                ? ("Signed in", "Today is in your menu bar now. You can close this tab.")
                 : ("Not signed in", "Nothing was shared. You can close this tab and try again from the menu bar."))
             self.finish(.success(query))
         }
@@ -316,14 +316,14 @@ final class LoopbackServer: @unchecked Sendable {
         if let (title, text) = body {
             html = """
             <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-            <meta name="color-scheme" content="light dark"><title>\(title) · today</title><style>
+            <meta name="color-scheme" content="light dark"><title>\(title) · Today</title><style>
             :root{--bg:#f7f7f5;--text:#1a1a1a;--muted:#555c64;--accent:#2f55e8}
             @media (prefers-color-scheme:dark){:root{--bg:#151619;--text:#e8eaed;--muted:#afb5bd;--accent:#93a6ff}}
             body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);color:var(--text);
             font:15px/1.55 -apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo",sans-serif}
             main{max-width:22rem;padding:24px}h1{margin:0 0 6px;font-size:20px;font-weight:650}p{margin:0;color:var(--muted)}
             b{display:block;margin-bottom:18px;color:var(--accent);font-size:13px;font-weight:600}
-            </style></head><body><main><b>today</b><h1>\(title)</h1><p>\(text)</p></main></body></html>
+            </style></head><body><main><b>Today</b><h1>\(title)</h1><p>\(text)</p></main></body></html>
             """
         }
         let bytes = Data(html.utf8)

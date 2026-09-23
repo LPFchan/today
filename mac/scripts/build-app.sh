@@ -1,11 +1,11 @@
 #!/bin/sh
-# Builds mac/build/today.app (Apple silicon, macOS 15+). The version comes
+# Builds mac/build/Today.app (Apple silicon, macOS 15+). The version comes
 # from the latest mac-vX.Y.Z tag; the build number is the commit count.
 # Signs with $SIGN_IDENTITY, else the "today Self-Signed" certificate (see
 # mac/README.md), else ad-hoc.
 set -eu
 root=$(cd "$(dirname "$0")/.." && pwd)
-app="$root/build/today.app"
+app="$root/build/Today.app"
 version=$(git -C "$root" describe --tags --abbrev=0 --match 'mac-v*' 2>/dev/null | sed 's/^mac-v//')
 version=${version:-0.0.0}
 build=$(git -C "$root" rev-list --count HEAD)
@@ -26,8 +26,8 @@ cat > "$app/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleIdentifier</key><string>plus.lost.today</string>
-  <key>CFBundleName</key><string>today</string>
-  <key>CFBundleDisplayName</key><string>today</string>
+  <key>CFBundleName</key><string>Today</string>
+  <key>CFBundleDisplayName</key><string>Today</string>
   <key>CFBundleExecutable</key><string>Today</string>
   <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundlePackageType</key><string>APPL</string>

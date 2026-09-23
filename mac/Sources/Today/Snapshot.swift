@@ -19,7 +19,7 @@ enum Snapshot {
         model.people = [
             Person(name: "yeowool", me: true, visibility: "public", items: [
                 Item(start: at(-150), end: at(-60), name: "Email"),
-                Item(start: at(-60), end: at(23.2), name: "Deep work on the today Mac app"),
+                Item(start: at(-60), end: at(23.2), name: "Deep work on the Mac app"),
                 Item(start: at(23.2), end: at(83.2), name: "Lunch"),
                 Item(start: at(83.2), end: at(143.2), name: "Guitar"),
                 Item(start: at(160), end: at(220), name: "Groceries"),

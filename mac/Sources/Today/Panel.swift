@@ -18,7 +18,7 @@ struct MenuBarLabel: View {
             let status = Status(person.items, at: model.now)
             return StatusIcon.image(remaining: status.remaining, countdown: status.countdown, dimmed: !status.isActive)
         }()
-        Image(nsImage: image).accessibilityLabel("today")
+        Image(nsImage: image).accessibilityLabel("Today")
     }
 }
 
@@ -281,7 +281,7 @@ private struct SignInCard: View {
             Text("Sign in to see your timer").font(.system(size: 15, weight: .semibold))
             Text(model.session == .signingIn
                  ? "Finish signing in in your browser."
-                 : (model.problem ?? "today reads your plan, and the plans friends share, from your lost.plus account."))
+                 : (model.problem ?? "Today reads your plan, and the plans friends share, from your lost.plus account."))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -332,7 +332,7 @@ private struct MenuRows: View {
             if model.session == .signedIn {
                 Row(title: "Sign Out") { model.signOut() }
             }
-            Row(title: "Quit today", shortcut: "Q") { NSApp.terminate(nil) }
+            Row(title: "Quit Today", shortcut: "Q") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
         .padding(.horizontal, 6)

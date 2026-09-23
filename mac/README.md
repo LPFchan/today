@@ -1,4 +1,4 @@
-# today for Mac
+# Today for Mac
 
 A menu bar app that shows the time left on your current item, or a friend's
 (anyone who shares their day publicly). Click it for the rest of the day and
@@ -19,9 +19,9 @@ an `api` route on the gateway. Tokens sit in
 Needs Xcode 16 or its Command Line Tools on Apple silicon.
 
 ```sh
-sh mac/scripts/build-app.sh   # mac/build/today.app
-sh mac/scripts/make-dmg.sh    # mac/build/today.dmg
-open mac/build/today.app --args --rehearse-first-launch   # replay onboarding
+sh mac/scripts/build-app.sh   # mac/build/Today.app
+sh mac/scripts/make-dmg.sh    # mac/build/Today.dmg
+open mac/build/Today.app --args --rehearse-first-launch   # replay onboarding
 ```
 
 `swift build --package-path mac && .build/debug/Today --snapshot DIR` (debug
@@ -36,7 +36,7 @@ redraws `Packaging/DMGBackground.png` from `Packaging/dmg-background.html`.
 ## Release
 
 Push a tag like `mac-v1.2.0`. `.github/workflows/mac.yml` builds and signs the
-app, packs `today.dmg` with [DMGMaker](https://github.com/saihgupr/DMGMaker),
+app, packs `Today.dmg` with [DMGMaker](https://github.com/saihgupr/DMGMaker),
 publishes a GitHub release (not marked latest, so the web app's watch
 download link keeps pointing at the watch), and adds it to the
 [Sparkle](https://sparkle-project.org) feed, `appcast.xml` on the

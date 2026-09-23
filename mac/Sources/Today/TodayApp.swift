@@ -35,7 +35,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Look for an update on every launch, on top of Sparkle's daily check.
         updater.updater.checkForUpdatesInBackground()
-        // `open today.app --args --rehearse-first-launch` replays what a new user sees.
+        // `open Today.app --args --rehearse-first-launch` replays what a new user sees.
         if CommandLine.arguments.contains("--rehearse-first-launch") || !UserDefaults.standard.bool(forKey: "onboarded") {
             showOnboarding()
         }

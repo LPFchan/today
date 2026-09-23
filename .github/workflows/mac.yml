@@ -1,6 +1,6 @@
 # The Mac menu bar app (mac/). Every push that touches it builds the app and
 # snapshots its UI (artifact "mac"). A tag like mac-v1.2.0 also signs it,
-# publishes a GitHub release with today.dmg, and adds it to the Sparkle feed
+# publishes a GitHub release with Today.dmg, and adds it to the Sparkle feed
 # (appcast.xml on the mac-appcast branch).
 name: mac
 
@@ -51,7 +51,7 @@ jobs:
         with:
           name: mac
           path: |
-            mac/build/today.dmg
+            mac/build/Today.dmg
             mac/build/snapshots
 
       - name: Sign update
@@ -61,7 +61,7 @@ jobs:
         run: |
           mkdir -p mac/build/sparkle
           curl -sL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar xJ -C mac/build/sparkle
-          echo "$SPARKLE_PRIVATE_KEY" | mac/build/sparkle/bin/sign_update --ed-key-file - mac/build/today.dmg > mac/build/signature
+          echo "$SPARKLE_PRIVATE_KEY" | mac/build/sparkle/bin/sign_update --ed-key-file - mac/build/Today.dmg > mac/build/signature
 
       - name: Publish release
         if: startsWith(github.ref, 'refs/tags/mac-v')
@@ -71,13 +71,13 @@ jobs:
           cat > mac/build/notes.md <<'NOTES'
           ## Installing
 
-          1. Open `today.dmg` and drag **today** into **Applications**.
-          2. Open today. macOS refuses the first launch because the app isn't notarized by Apple.
+          1. Open `Today.dmg` and drag **Today** into **Applications**.
+          2. Open Today. macOS refuses the first launch because the app isn't notarized by Apple.
           3. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**, then open it again.
 
-          Already installed? today updates itself.
+          Already installed? Today updates itself.
           NOTES
-          gh release create "$GITHUB_REF_NAME" mac/build/today.dmg --title "today for Mac ${GITHUB_REF_NAME#mac-v}" --notes-file mac/build/notes.md --latest=false
+          gh release create "$GITHUB_REF_NAME" mac/build/Today.dmg --title "Today for Mac ${GITHUB_REF_NAME#mac-v}" --notes-file mac/build/notes.md --latest=false
 
       - name: Add to update feed
         if: startsWith(github.ref, 'refs/tags/mac-v')
@@ -92,7 +92,7 @@ jobs:
             git worktree add --orphan -b mac-appcast "$feed"
           fi
           python3 mac/scripts/appcast.py "$feed/appcast.xml" "$version" "$build" \
-            "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/today.dmg" "$(cat mac/build/signature)"
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/Today.dmg" "$(cat mac/build/signature)"
           cd "$feed"
           git config user.name "github-actions[bot]"
           git config user.email "41898283+github-actions[bot]@users.noreply.github.com"

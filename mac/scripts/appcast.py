@@ -15,7 +15,7 @@ if not feed.exists():
     feed.write_text("""<?xml version="1.0" encoding="utf-8"?>
 <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
   <channel>
-    <title>today</title>
+    <title>Today</title>
     <link>https://raw.githubusercontent.com/LPFchan/today/mac-appcast/appcast.xml</link>
     <language>en</language>
   </channel>
