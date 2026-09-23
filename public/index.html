@@ -31,8 +31,8 @@
           <svg class="bell-on" aria-hidden="true" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15L6 16ZM10 20.5a2.2 2.2 0 0 0 4 0" /></svg>
           <svg class="bell-off" aria-hidden="true" viewBox="0 0 24 24"><path d="M8.5 5.6A6 6 0 0 1 18 11v4M6 11v5l-1.5 2H17M10 20.5a2.2 2.2 0 0 0 4 0M4 4l16 16" /></svg>
         </button>
-        <button class="icon-button" id="watchButton" type="button" data-t-label="watch" data-t-title="watch">
-          <svg aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 9.5V12l1.5 1" /></svg>
+        <button class="icon-button" id="appsButton" type="button" data-t-label="apps" data-t-title="apps">
+          <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
         </button>
         <details class="account" id="account">
           <summary class="avatar" data-t-label="account" id="avatar"></summary>
@@ -140,21 +140,39 @@
       </div>
     </dialog>
 
-    <dialog class="modal" id="watchDialog" aria-labelledby="watchTitle">
+    <dialog class="modal apps" id="appsDialog" aria-labelledby="appsTitle">
       <div class="sheet-head">
-        <h2 id="watchTitle" data-t="watchTitle"></h2>
-        <button class="icon-button" type="button" id="closeWatch" data-t-label="close">
+        <h2 id="appsTitle" data-t="appsTitle"></h2>
+        <button class="icon-button" type="button" id="closeApps" data-t-label="close">
           <svg aria-hidden="true" viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
         </button>
       </div>
-      <p data-t="watchBody"></p>
-      <ol class="steps">
-        <li data-t="watchStep1"></li>
-        <li data-t="watchStep2"></li>
-        <li data-t="watchStep3"></li>
-      </ol>
-      <a class="btn primary" href="https://github.com/LPFchan/today/releases/latest/download/today.pbw" data-t="watchDownload"></a>
-      <p class="field-hint" data-t="watchUnpair"></p>
+      <div class="app-cards">
+        <section class="app-card" aria-labelledby="watchTitle">
+          <svg class="app-glyph" aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 9.5V12l1.5 1" /></svg>
+          <h3 id="watchTitle" data-t="watchTitle"></h3>
+          <p data-t="watchBody"></p>
+          <ol class="steps">
+            <li data-t="watchStep1"></li>
+            <li data-t="watchStep2"></li>
+            <li data-t="watchStep3"></li>
+          </ol>
+          <p class="field-hint" data-t="watchUnpair"></p>
+          <a class="btn primary" href="https://github.com/LPFchan/today/releases/latest/download/today.pbw" data-t="watchDownload"></a>
+        </section>
+        <section class="app-card" aria-labelledby="macTitle">
+          <svg class="app-glyph" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2" /><path d="M2.5 19h19" /></svg>
+          <h3 id="macTitle" data-t="macTitle"></h3>
+          <p data-t="macBody"></p>
+          <ol class="steps">
+            <li data-t="macStep1"></li>
+            <li data-t="macStep2"></li>
+            <li data-t="macStep3"></li>
+          </ol>
+          <p class="field-hint" data-t="macNote"></p>
+          <a class="btn primary" href="/download/mac" data-t="macDownload"></a>
+        </section>
+      </div>
     </dialog>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>

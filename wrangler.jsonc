@@ -14,8 +14,9 @@
     "directory": "public",
     // /everyone is the same page as /; the app picks the view from the path.
     "not_found_handling": "single-page-application",
-    // The API and the pairing mailbox are code; everything else is a file.
-    "run_worker_first": ["/api/*", "/pair", "/pair/*"]
+    // The API, the pairing mailbox and the Mac download redirect are code;
+    // everything else is a file.
+    "run_worker_first": ["/api/*", "/pair", "/pair/*", "/download/*"]
   },
   "d1_databases": [
     {

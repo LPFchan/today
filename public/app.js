@@ -39,9 +39,9 @@ const el = {
   shiftBody: $('#shiftBody'),
   keepTimes: $('#keepTimes'),
   shiftToNow: $('#shiftToNow'),
-  watchButton: $('#watchButton'),
-  watchDialog: $('#watchDialog'),
-  closeWatch: $('#closeWatch'),
+  appsButton: $('#appsButton'),
+  appsDialog: $('#appsDialog'),
+  closeApps: $('#closeApps'),
   fullscreenButton: $('#fullscreenButton'),
   account: $('#account'),
   avatar: $('#avatar'),
@@ -764,10 +764,10 @@ el.shiftToNow.addEventListener('click', () => {
 });
 el.shiftDialog.addEventListener('close', () => (state.pendingStart = null));
 
-el.watchButton.addEventListener('click', () => el.watchDialog.showModal());
-el.closeWatch.addEventListener('click', () => el.watchDialog.close());
-el.watchDialog.addEventListener('click', (event) => {
-  if (event.target === el.watchDialog) el.watchDialog.close();
+el.appsButton.addEventListener('click', () => el.appsDialog.showModal());
+el.closeApps.addEventListener('click', () => el.appsDialog.close());
+el.appsDialog.addEventListener('click', (event) => {
+  if (event.target === el.appsDialog) el.appsDialog.close();
 });
 el.fullscreenButton.addEventListener('click', toggleFullscreen);
 

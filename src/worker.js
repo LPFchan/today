@@ -10,6 +10,7 @@
 //   /api/board  api     — the same, for the Mac app, or a browser session
 //   /pair       public  — the watch pairing mailbox; never reads identity
 //   /           oauth   — everything else, browser session only
+//                         (including /download/mac, the newest Mac app)
 //
 // Static files in public/ are served before this code runs; see wrangler.jsonc.
 
@@ -31,6 +32,10 @@ const BOARD_KEEP_MS = 12 * 60 * 60_000;
 // Watch payload limits: item count, and bytes per name (UTF-8).
 const WATCH_ITEMS = 32;
 const WATCH_NAME_BYTES = 60;
+// Mac releases aren't GitHub's "latest" (the watch owns that link), so the
+// newest Mac download is read from the Sparkle feed, which lists newest first.
+const MAC_FEED = 'https://raw.githubusercontent.com/LPFchan/today/mac-appcast/appcast.xml';
+const MAC_RELEASES = 'https://github.com/LPFchan/today/releases/';
 
 export default {
   async fetch(request, env) {
@@ -42,6 +47,9 @@ export default {
       if (url.pathname.startsWith('/api/')) {
         return await api(request, env, url);
       }
+      if (url.pathname === '/download/mac') {
+        return await macDownload();
+      }
       return json(404, { error: 'not_found' });
     } catch (error) {
       console.error(error);
@@ -49,6 +57,13 @@ export default {
     }
   },
 };
+
+async function macDownload() {
+  const feed = await fetch(MAC_FEED, { cf: { cacheTtl: 300 } });
+  const latest = feed.ok ? /<enclosure url="([^"]+)"/.exec(await feed.text())?.[1] : null;
+  const to = latest?.startsWith(`${MAC_RELEASES}download/`) ? latest : MAC_RELEASES;
+  return Response.redirect(to, 302);
+}
 
 /* ---------- API (identity required) ---------- */
 

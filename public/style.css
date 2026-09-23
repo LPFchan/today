@@ -1085,8 +1085,58 @@ textarea[aria-invalid='true'] {
   padding-left: 1.3em;
 }
 
-#watchDialog .btn.primary {
+.modal.apps {
+  width: min(680px, calc(100vw - 24px));
+}
+
+.app-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.app-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.app-card > * {
+  margin: 0;
+}
+
+.app-card h3 {
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.app-card .steps {
+  margin: 4px 0;
+}
+
+.app-card .btn.primary {
   width: 100%;
+  margin-top: auto;
+}
+
+.app-card .field-hint {
+  margin-bottom: 8px;
+}
+
+.app-glyph {
+  width: 28px;
+  height: 28px;
+  color: var(--accent);
+}
+
+@media (max-width: 560px) {
+  .app-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* ---------- toast ---------- */

@@ -164,3 +164,21 @@ test('declining on the hub cancels the pairing', async () => {
   assert.equal(declined.status, 200);
   assert.equal((await call('POST', '/pair/poll', { body: { id, secret } })).status, 410);
 });
+
+test('the Mac download goes to the newest release in the Sparkle feed', async () => {
+  const call = client({ DB: testDatabase() });
+  const realFetch = globalThis.fetch;
+  try {
+    globalThis.fetch = async () => new Response(`<item><enclosure url="https://github.com/LPFchan/today/releases/download/mac-v1.0.1/Today.dmg" /></item>
+      <item><enclosure url="https://github.com/LPFchan/today/releases/download/mac-v1.0.0/today.dmg" /></item>`);
+    const newest = await call('GET', '/download/mac');
+    assert.equal(newest.status, 302);
+    assert.equal(newest.headers.get('location'), 'https://github.com/LPFchan/today/releases/download/mac-v1.0.1/Today.dmg');
+
+    globalThis.fetch = async () => new Response('', { status: 404 });
+    const missing = await call('GET', '/download/mac');
+    assert.equal(missing.headers.get('location'), 'https://github.com/LPFchan/today/releases/');
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
