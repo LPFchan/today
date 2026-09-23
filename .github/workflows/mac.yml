@@ -1,0 +1,101 @@
+# The Mac menu bar app (mac/). Every push that touches it builds the app and
+# snapshots its UI (artifact "mac"). A tag like mac-v1.2.0 also signs it,
+# publishes a GitHub release with today.dmg, and adds it to the Sparkle feed
+# (appcast.xml on the mac-appcast branch).
+name: mac
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["mac-v*"]
+    paths: ["mac/**", ".github/workflows/mac.yml"]
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # the build number is the commit count
+
+      - name: Import signing certificate
+        if: startsWith(github.ref, 'refs/tags/mac-v')
+        env:
+          P12: ${{ secrets.MAC_SIGNING_CERT_P12 }}
+          P12_PASSWORD: ${{ secrets.MAC_SIGNING_CERT_PASSWORD }}
+        run: |
+          kc="$RUNNER_TEMP/signing.keychain-db"
+          security create-keychain -p "" "$kc"
+          security set-keychain-settings "$kc"
+          security unlock-keychain -p "" "$kc"
+          echo "$P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$kc" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "" "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
+
+      - name: Build
+        run: |
+          sh mac/scripts/build-app.sh
+          sh mac/scripts/make-dmg.sh
+
+      - name: Snapshot the UI
+        run: |
+          swift build --package-path mac
+          "$(swift build --package-path mac --show-bin-path)/Today" --snapshot mac/build/snapshots
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac
+          path: |
+            mac/build/today.dmg
+            mac/build/snapshots
+
+      - name: Sign update
+        if: startsWith(github.ref, 'refs/tags/mac-v')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.MAC_SPARKLE_PRIVATE_KEY }}
+        run: |
+          mkdir -p mac/build/sparkle
+          curl -sL https://github.com/sparkle-project/Sparkle/releases/download/2.10.0/Sparkle-2.10.0.tar.xz | tar xJ -C mac/build/sparkle
+          echo "$SPARKLE_PRIVATE_KEY" | mac/build/sparkle/bin/sign_update --ed-key-file - mac/build/today.dmg > mac/build/signature
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/mac-v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cat > mac/build/notes.md <<'NOTES'
+          ## Installing
+
+          1. Open `today.dmg` and drag **today** into **Applications**.
+          2. Open today. macOS refuses the first launch because the app isn't notarized by Apple.
+          3. Go to **System Settings → Privacy & Security**, scroll down and click **Open Anyway**, then open it again.
+
+          Already installed? today updates itself.
+          NOTES
+          gh release create "$GITHUB_REF_NAME" mac/build/today.dmg --title "today for Mac ${GITHUB_REF_NAME#mac-v}" --notes-file mac/build/notes.md --latest=false
+
+      - name: Add to update feed
+        if: startsWith(github.ref, 'refs/tags/mac-v')
+        run: |
+          version="${GITHUB_REF_NAME#mac-v}"
+          build=$(git rev-list --count HEAD)
+          feed="$RUNNER_TEMP/feed"
+          if git fetch origin mac-appcast; then
+            git worktree add "$feed" FETCH_HEAD
+            git -C "$feed" switch -c mac-appcast
+          else
+            git worktree add --orphan -b mac-appcast "$feed"
+          fi
+          python3 mac/scripts/appcast.py "$feed/appcast.xml" "$version" "$build" \
+            "https://github.com/$GITHUB_REPOSITORY/releases/download/$GITHUB_REF_NAME/today.dmg" "$(cat mac/build/signature)"
+          cd "$feed"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Appcast: $GITHUB_REF_NAME"
+          git push origin mac-appcast

@@ -7,6 +7,7 @@
 // gateway/config/cloudflare.gateway.json):
 //
 //   /api/watch  api     — the watch's hub-issued OAuth token, or a browser session
+//   /api/board  api     — the same, for the Mac app, or a browser session
 //   /pair       public  — the watch pairing mailbox; never reads identity
 //   /           oauth   — everything else, browser session only
 //

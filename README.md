@@ -1,6 +1,6 @@
 # today
 
-**[today.lost.plus](https://today.lost.plus)** — write today's plan as text, get a big timer for what you should be doing now, and see what your friends are up to. A Pebble app puts the timer on your wrist.
+**[today.lost.plus](https://today.lost.plus)** — write today's plan as text, get a big timer for what you should be doing now, and see what your friends are up to. A Pebble app puts the timer on your wrist, and a Mac app puts yours or a friend's in the menu bar.
 
 ```text
 09:00-10:30 Deep work
@@ -19,6 +19,7 @@ Based on marie's `오늘 흐름`.
 | `public/` | the web app (plain HTML/CSS/JS, no build) and the shared schedule parser |
 | `migrations/` | D1 schema |
 | `watch/` | Pebble app (C on the watch, PebbleKit JS on the phone) |
+| `mac/` | Mac menu bar app (SwiftUI, Sparkle); see `mac/README.md` |
 
 The Worker has no route of its own. It sits behind the lost.plus Common Auth
 gateway (`LPFchan/auth`), which signs people in and passes their identity
@@ -42,4 +43,6 @@ npm run deploy    # wrangler deploy
 ```
 
 The watch app builds in CI (`.github/workflows/watch.yml`) and is attached to
-GitHub releases as `today.pbw`.
+GitHub releases as `today.pbw`. The Mac app builds in CI too
+(`.github/workflows/mac.yml`); a `mac-v*` tag publishes `today.dmg` and its
+Sparkle update.

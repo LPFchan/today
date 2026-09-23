@@ -1,0 +1,28 @@
+<!doctype html>
+<!-- The DMG window background (600×600, rendered at 2×). DMGMaker draws the
+     glass panel, arrow and "To install today" text on top, roughly the
+     middle band (y 170–470), so decoration stays out of it.
+     Render: mac/scripts/make-dmg-background.sh -->
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 600px; height: 600px; overflow: hidden; }
+  body {
+    position: relative;
+    background:
+      radial-gradient(circle at 18% 12%, rgba(120, 150, 255, 0.55), transparent 55%),
+      radial-gradient(circle at 88% 92%, rgba(40, 70, 200, 0.5), transparent 50%),
+      linear-gradient(165deg, #4a6ef0 0%, #2f55e8 45%, #1a2f8f 100%);
+  }
+  /* A soft clock outline in the top corner, the icon's shape. */
+  svg { position: absolute; top: 30px; right: 36px; }
+</style>
+</head>
+<body>
+  <svg width="96" height="96" viewBox="0 0 64 64" fill="none" stroke="rgba(255,255,255,0.14)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="32" cy="32" r="26"/>
+    <path d="M32 16v16l10 7"/>
+  </svg>
+</body>
+</html>
