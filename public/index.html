@@ -149,28 +149,56 @@
       </div>
       <div class="app-cards">
         <section class="app-card" aria-labelledby="watchTitle">
-          <svg class="app-glyph" aria-hidden="true" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="3" /><path d="M9 6l.7-3h4.6l.7 3M9 18l.7 3h4.6l.7-3M12 9.5V12l1.5 1" /></svg>
+          <div class="app-stage" aria-hidden="true">
+            <div class="pebble">
+              <div class="pebble-screen">
+                <span class="pebble-clock">14:32</span>
+                <span class="pebble-name" data-t="mockItem"></span>
+                <span class="pebble-timer">24:13</span>
+                <span class="pebble-next" data-t="mockNext"></span>
+              </div>
+            </div>
+          </div>
           <h3 id="watchTitle" data-t="watchTitle"></h3>
           <p data-t="watchBody"></p>
-          <ol class="steps">
+          <ol class="app-steps">
             <li data-t="watchStep1"></li>
             <li data-t="watchStep2"></li>
             <li data-t="watchStep3"></li>
           </ol>
-          <p class="field-hint" data-t="watchUnpair"></p>
-          <a class="btn primary" href="https://github.com/LPFchan/today/releases/latest/download/today.pbw" data-t="watchDownload"></a>
+          <a class="btn primary" href="https://github.com/LPFchan/today/releases/latest/download/today.pbw">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
+            <span data-t="watchDownload"></span>
+          </a>
         </section>
         <section class="app-card" aria-labelledby="macTitle">
-          <svg class="app-glyph" aria-hidden="true" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2" /><path d="M2.5 19h19" /></svg>
-          <h3 id="macTitle" data-t="macTitle"></h3>
+          <div class="app-stage" aria-hidden="true">
+            <div class="menubar">
+              <svg viewBox="0 0 24 24"><path d="M4 10a12 12 0 0 1 16 0M7 13.5a7.5 7.5 0 0 1 10 0M10.2 17a3 3 0 0 1 3.6 0" /></svg>
+              <svg viewBox="0 0 24 24"><rect x="3" y="8" width="16" height="8" rx="2" /><path d="M21 11v2" /></svg>
+              <span class="menubar-today">
+                <svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.5" /><path class="wedge" d="M8 8V3a5 5 0 1 1-4.33 7.5Z" /></svg>
+                24:13
+              </span>
+              <span class="menubar-clock">14:32</span>
+            </div>
+            <div class="menubar-panel">
+              <div class="menubar-people"><i class="is-on"></i><i></i><i></i></div>
+              <span class="menubar-name" data-t="mockItem"></span>
+              <div class="menubar-bar"><i></i></div>
+            </div>
+          </div>
+          <h3 id="macTitle"><span data-t="macTitle"></span> <small>macOS 15+</small></h3>
           <p data-t="macBody"></p>
-          <ol class="steps">
+          <ol class="app-steps">
             <li data-t="macStep1"></li>
-            <li data-t="macStep2"></li>
+            <li data-t="macStep2" data-t-title="macStep2Hint"></li>
             <li data-t="macStep3"></li>
           </ol>
-          <p class="field-hint" data-t="macNote"></p>
-          <a class="btn primary" href="/download/mac" data-t="macDownload"></a>
+          <a class="btn primary" href="/download/mac">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 19h14" /></svg>
+            <span data-t="macDownload"></span>
+          </a>
         </section>
       </div>
     </dialog>

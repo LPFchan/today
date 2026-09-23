@@ -1114,8 +1114,11 @@ textarea[aria-invalid='true'] {
   font-weight: 650;
 }
 
-.app-card .steps {
-  margin: 4px 0;
+.app-card h3 small {
+  margin-left: 4px;
+  color: var(--text-meta);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .app-card .btn.primary {
@@ -1123,14 +1126,188 @@ textarea[aria-invalid='true'] {
   margin-top: auto;
 }
 
-.app-card .field-hint {
-  margin-bottom: 8px;
+.app-stage {
+  display: grid;
+  height: 150px;
+  margin-bottom: 6px !important;
+  position: relative;
+  place-items: center;
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 40%, var(--accent-soft), transparent 70%), var(--surface-2);
+  overflow: hidden;
 }
 
-.app-glyph {
-  width: 28px;
-  height: 28px;
-  color: var(--accent);
+.app-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 12px !important;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.app-steps li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+  border-radius: 999px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  font-size: 12px;
+  counter-increment: step;
+}
+
+.app-steps li::before {
+  content: counter(step);
+  display: grid;
+  width: 18px;
+  height: 18px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--on-accent-solid);
+  background: var(--accent-solid);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.app-steps li[title] {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* A Pebble Time Steel-ish watch showing the timer screen. */
+.pebble {
+  padding: 12px 10px;
+  border-radius: 18px;
+  background: linear-gradient(160deg, #50535a, #25272c);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 25%);
+}
+
+.pebble-screen {
+  display: grid;
+  width: 96px;
+  height: 112px;
+  align-content: center;
+  justify-items: center;
+  border-radius: 4px;
+  color: #111;
+  background: #f4f4f0;
+  line-height: 1.15;
+}
+
+.pebble-clock {
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.pebble-name {
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.pebble-timer {
+  font: 700 26px/1.1 var(--mono);
+  letter-spacing: -1px;
+}
+
+.pebble-next {
+  color: #666;
+  font-size: 10px;
+}
+
+/* A slice of the macOS menu bar with Today's item and its panel. */
+.menubar {
+  display: flex;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  height: 26px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 14px;
+  color: var(--text);
+  background: color-mix(in srgb, var(--surface) 80%, transparent);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.menubar > svg {
+  width: 15px;
+  height: 15px;
+  opacity: 0.55;
+}
+
+.menubar-today {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 -5px;
+  padding: 2px 5px;
+  border-radius: 5px;
+  background: var(--hover);
+  font-variant-numeric: tabular-nums;
+}
+
+.menubar-today svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.5;
+}
+
+.menubar-today .wedge {
+  fill: currentColor;
+  stroke: none;
+}
+
+.menubar-panel {
+  display: grid;
+  position: absolute;
+  top: 34px;
+  right: 22px;
+  width: 150px;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--hair);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 18%);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.menubar-people {
+  display: flex;
+  gap: 5px;
+}
+
+.menubar-people i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface-2);
+}
+
+.menubar-people i.is-on {
+  background: var(--accent-solid);
+}
+
+.menubar-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-2);
+}
+
+.menubar-bar i {
+  display: block;
+  width: 64%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent-solid);
 }
 
 @media (max-width: 560px) {
