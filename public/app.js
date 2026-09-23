@@ -302,105 +302,126 @@ function renderAgenda(day) {
 /* ---------- everyone ---------- */
 
 const expanded = new Set();
+const HOUR = 60 * MINUTE;
+const SECONDS_BELOW = 5 * MINUTE;
 
-function personStatus(items, now) {
+/** Time left: whole minutes, or minutes and seconds in the last five. */
+function remaining(ms) {
+  if (ms < SECONDS_BELOW) {
+    const s = Math.max(0, Math.ceil(ms / 1000));
+    return Math.floor(s / 60) ? t('shortLeftSec', { m: Math.floor(s / 60), s: s % 60 }) : t('shortSec', { s });
+  }
+  return shortLeft(ms);
+}
+
+/** What someone is doing now, and what comes next. */
+function personNow(items, now) {
   const day = dayState(items, now);
   const item = items[day.index];
   switch (day.kind) {
-    case 'active':
-      return { active: true, text: t('personActive', { name: item.name, left: shortLeft(item.end - now) }) };
-    case 'break':
-      return { text: t('personBreak', { time: clock(item.start), name: item.name }) };
+    case 'active': {
+      const next = items[day.index + 1];
+      return {
+        active: true,
+        title: item.name,
+        left: remaining(item.end - now),
+        urgent: item.end - now < SECONDS_BELOW,
+        next: next ? t('nextAt', { time: clock(next.start), name: next.name }) : '',
+      };
+    }
     case 'waiting':
-      return { text: t('personWaiting', { time: clock(item.start), name: item.name }) };
+    case 'break':
+      return {
+        title: t(day.kind === 'break' ? 'onBreak' : 'notStarted'),
+        left: t('startsIn', { left: remaining(item.start - now) }),
+        urgent: item.start - now < SECONDS_BELOW,
+        next: t('nextAt', { time: clock(item.start), name: item.name }),
+      };
     case 'finished':
-      return { text: t('dayDone') };
+      return { title: t('dayDone') };
     default:
-      return { text: t('noPlan') };
+      return { title: t('noPlan') };
   }
 }
 
-/** The visible window: every shown item plus now, whole hours, at least 8 hours wide. */
-function boardWindow(people, now) {
-  const times = people.flatMap((p) => p.items.flatMap((i) => [i.start, i.end]));
-  const hour = 60 * MINUTE;
-  let from = Math.floor(Math.min(now, ...times) / hour) * hour;
-  let to = Math.ceil(Math.max(now + hour, ...times) / hour) * hour;
-  if (to - from < 8 * hour) {
-    const pad = 8 * hour - (to - from);
-    from -= Math.floor(pad / 2 / hour) * hour;
-    to = from + 8 * hour;
+/** The lane shows a window around now: an hour behind, the rest ahead. */
+function laneWindow(now) {
+  const hours = matchMedia('(max-width: 720px)').matches ? 6 : 12;
+  const from = Math.floor((now - HOUR) / HOUR) * HOUR;
+  return { from, to: from + hours * HOUR, hours };
+}
+
+function node(tag, className, text) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  if (text !== undefined) element.textContent = text;
+  return element;
+}
+
+function renderLane(items, now, range) {
+  const pct = (ms) => `${(((ms - range.from) / (range.to - range.from)) * 100).toFixed(3)}%`;
+  const lane = node('div', 'lane');
+  lane.setAttribute('aria-hidden', 'true');
+  lane.style.setProperty('--hours', range.hours);
+  for (const item of items) {
+    if (item.end <= range.from || item.start >= range.to) continue;
+    const start = Math.max(item.start, range.from);
+    const end = Math.min(item.end, range.to);
+    const block = node('span', 'block', item.name);
+    if (now >= item.end) block.classList.add('is-past');
+    else if (now >= item.start) block.classList.add('is-now');
+    block.style.left = pct(start);
+    block.style.width = `calc(${pct(end)} - ${pct(start)})`;
+    block.title = `${clock(item.start)}–${clock(item.end)} ${item.name}`;
+    lane.append(block);
   }
-  return { from, to, span: to - from, hours: (to - from) / hour };
+  lane.append(Object.assign(node('span', 'now-mark'), { style: `left:${pct(now)}` }));
+
+  const ticks = node('div', 'lane-ticks');
+  ticks.setAttribute('aria-hidden', 'true');
+  const step = range.hours > 8 ? 2 : 1;
+  for (let h = step; h < range.hours; h += step) {
+    const at = range.from + h * HOUR;
+    ticks.append(Object.assign(node('span', '', clock(at).slice(0, 2)), { style: `left:${pct(at)}` }));
+  }
+  return [lane, ticks];
 }
 
 function renderBoard() {
   if (!state.board) return;
   const now = Date.now();
-  const people = state.board.people;
-  const { from, span, hours } = boardWindow(people, now);
-  const pct = (ms) => `${(((ms - from) / span) * 100).toFixed(3)}%`;
+  const range = laneWindow(now);
+  // You first, then whoever has something going on, then everyone else.
+  const busy = (person) => ['active', 'waiting', 'break'].includes(dayState(person.items, now).kind);
+  const people = [...state.board.people].sort((a, b) => Number(b.me) - Number(a.me) || Number(busy(b)) - Number(busy(a)));
 
-  const axis = document.createElement('div');
-  axis.className = 'board-axis';
-  axis.setAttribute('aria-hidden', 'true');
-  const ticks = document.createElement('div');
-  ticks.className = 'axis-ticks';
-  const step = hours > 14 ? 3 : hours > 9 ? 2 : 1;
-  for (let h = 0; h < hours; h += step) {
-    const at = from + h * 60 * MINUTE;
-    ticks.append(Object.assign(document.createElement('span'), { textContent: clock(at).slice(0, 2), style: `left:${pct(at)}` }));
-  }
-  axis.append(document.createElement('span'), ticks);
-
-  const list = document.createElement('ul');
-  list.className = 'people';
-  list.style.setProperty('--hour', `calc(100% / ${hours})`);
-
+  const list = node('ul', 'people');
   people.forEach((person, index) => {
     const key = person.me ? 'me' : `${person.name}#${index}`;
-    const status = personStatus(person.items, now);
-    const li = document.createElement('li');
-    li.className = 'person';
+    const status = personNow(person.items, now);
+    const hasPlan = status.left !== undefined;
+    const open = expanded.has(key) && person.items.length > 0;
 
-    const summary = document.createElement('button');
+    const li = node('li', `person${hasPlan ? '' : ' is-idle'}`);
+    const summary = node('button', 'person-summary');
     summary.type = 'button';
-    summary.className = 'person-summary';
-    summary.setAttribute('aria-expanded', String(expanded.has(key)));
-    summary.setAttribute('aria-label', `${t('showSchedule', { name: person.name })}. ${status.text}`);
     summary.disabled = !person.items.length;
+    summary.setAttribute('aria-expanded', String(open));
+    summary.setAttribute('aria-label', [t('showSchedule', { name: person.name }), status.title, status.left, status.next].filter(Boolean).join('. '));
 
-    const meta = document.createElement('span');
-    meta.className = 'person-meta';
-    const name = document.createElement('span');
-    name.className = 'person-name';
-    name.append(Object.assign(document.createElement('span'), { className: 'name', textContent: person.name }));
-    if (person.me) name.append(Object.assign(document.createElement('span'), { className: 'you', textContent: t('you') }));
-    meta.append(
-      name,
-      Object.assign(document.createElement('span'), {
-        className: `person-status${status.active ? ' is-active' : ''}`,
-        textContent: status.text,
-      }),
-    );
+    const who = node('span', 'person-name');
+    who.append(node('span', 'name', person.name));
+    if (person.me) who.append(node('span', 'you', t('you')));
 
-    const lane = document.createElement('span');
-    lane.className = 'lane';
-    lane.setAttribute('aria-hidden', 'true');
-    for (const item of person.items) {
-      const block = document.createElement('span');
-      block.className = 'block';
-      if (now >= item.end) block.classList.add('is-past');
-      else if (now >= item.start) block.classList.add('is-now');
-      block.style.left = pct(item.start);
-      block.style.width = `calc(${pct(item.end)} - ${pct(item.start)})`;
-      block.textContent = item.name;
-      block.title = `${clock(item.start)}–${clock(item.end)} ${item.name}`;
-      lane.append(block);
+    const current = node('span', 'person-now');
+    current.append(node('span', `person-title${status.active ? ' is-active' : ''}`, status.title));
+    if (status.left) current.append(node('span', `person-left${status.urgent ? ' is-urgent' : ''}`, status.left));
+
+    summary.append(who, current);
+    if (status.next) summary.append(node('span', 'person-next', status.next));
+    if (person.items.some((item) => item.end > range.from && item.start < range.to)) {
+      summary.append(...renderLane(person.items, now, range));
     }
-    lane.append(Object.assign(document.createElement('span'), { className: 'now-mark', style: `left:${pct(now)}` }));
-
-    summary.append(meta, lane);
     summary.addEventListener('click', () => {
       if (expanded.has(key)) expanded.delete(key);
       else expanded.add(key);
@@ -408,19 +429,11 @@ function renderBoard() {
     });
     li.append(summary);
 
-    if (expanded.has(key) && person.items.length) {
-      const detail = document.createElement('ol');
-      detail.className = 'person-detail';
+    if (open) {
+      const detail = node('ol', 'person-detail');
       for (const item of person.items) {
-        const row = document.createElement('li');
-        if (now >= item.start && now < item.end) row.className = 'is-now';
-        row.append(
-          Object.assign(document.createElement('span'), {
-            className: 'agenda-time',
-            textContent: `${clock(item.start)}–${clock(item.end)}`,
-          }),
-          Object.assign(document.createElement('span'), { textContent: item.name }),
-        );
+        const row = node('li', now >= item.end ? 'is-past' : now >= item.start ? 'is-now' : '');
+        row.append(node('span', 'agenda-time', `${clock(item.start)}–${clock(item.end)}`), node('span', '', item.name));
         detail.append(row);
       }
       li.append(detail);
@@ -428,10 +441,8 @@ function renderBoard() {
     list.append(li);
   });
 
-  const nodes = [axis, list];
-  if (!people.some((p) => !p.me)) {
-    nodes.push(Object.assign(document.createElement('p'), { className: 'board-empty', textContent: t('everyoneEmpty') }));
-  }
+  const nodes = [list];
+  if (!people.some((p) => !p.me)) nodes.push(node('p', 'board-empty', t('everyoneEmpty')));
   // Re-rendering replaces the rows; keep keyboard focus on the same person.
   const focusedRow = document.activeElement?.closest?.('.person');
   const focusIndex = focusedRow ? [...el.board.querySelectorAll('.person')].indexOf(focusedRow) : -1;
@@ -786,9 +797,9 @@ document.addEventListener('visibilitychange', () => {
 
 setInterval(() => {
   if (document.visibilityState !== 'visible') return;
-  // The board changes by the minute; the timer by the second.
+  // The board changes by the minute, and by the second in anyone's last five.
   if (state.view === 'mine') renderMine();
-  else if (new Date().getSeconds() % 15 === 0) renderBoard();
+  else if (new Date().getSeconds() % 15 === 0 || el.board.querySelector('.is-urgent')) renderBoard();
 }, 1000);
 setInterval(() => {
   if (document.visibilityState === 'visible' && state.view === 'everyone') loadBoard();
