@@ -71,10 +71,6 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
   - Owner: operator
   - Trigger: mac-v1.0.0 is up.
   - Related ids: DEC-20260923-003
-- Next: back up the Mac release keys (Sparkle private key, signing .p12 and its password) to passage.
-  - Owner: operator
-  - Trigger: they exist only in the repo secrets and `~/.config/today-mac/` on oci-ubuntu.
-  - Related ids: DEC-20260923-003
 
 - Next: pair a real watch end to end.
   - Owner: operator

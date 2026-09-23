@@ -51,5 +51,6 @@ Repository secrets:
   code-signing certificate (base64 .p12). Gatekeeper doesn't trust it, but
   keeping the same one keeps the app's identity across updates.
 
-GitHub can't show secrets again. Losing the Sparkle key means existing
-installs can never update again, so keep a copy in passage.
+GitHub can't show secrets again; backups live in passage (folder `sparkle`,
+entries `today_*`). Losing the Sparkle key means existing installs can never
+update again.
