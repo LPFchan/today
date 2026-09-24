@@ -12,7 +12,7 @@
 
 #define MAX_ITEMS 32
 #define NAME_BYTES 64
-#define MAX_QR 41  // QR version 6; the pairing link needs version 3
+#define MAX_QR 41  // QR version 6; the pairing link needs version 4
 
 #define PERSIST_COUNT 1
 #define PERSIST_ITEM_BASE 100

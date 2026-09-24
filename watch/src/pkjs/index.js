@@ -3,31 +3,27 @@
 // Signs in to lost.plus once through a QR code shown on the watch, then
 // fetches your plan from today.lost.plus and hands it to the watch.
 //
-// Pairing, in short (the server half is in src/worker.js):
-//   1. register an OAuth client with the hub (once)
-//   2. POST /pair/new → a short link and the PKCE verifier
-//   3. the watch shows the link as a QR; you scan it and approve on the hub
-//   4. poll POST /pair/poll until the hub's code arrives, then redeem it with
-//      the verifier at the hub's token endpoint
-// The token is bound to today.lost.plus with scope `today`, so it can read your
-// plan and nothing else. The refresh token doesn't rotate (see ensureClient)
-// and lives in this app's localStorage.
+// Pairing is the hub's device login, the same one the setup CLI uses:
+//   1. POST /api/device naming today → a device code and an approval link
+//   2. the watch shows the link as a QR; you scan it and approve on the hub
+//   3. poll POST /api/device/token until you have, which returns a device
+//      session and a first access token
+// The session never rotates, so a watch reboot that kills a request halfway
+// loses nothing. It lives in this app's localStorage and buys one-hour access
+// tokens bound to today.lost.plus with scope `today`: your plan and nothing
+// else.
 
 var qrcode = require('qrcode-generator');
 
 var BASE = 'https://today.lost.plus';
 var HUB = 'https://auth.lost.plus';
-var REDIRECT = BASE + '/pair/done';
 var RESOURCE = BASE + '/mcp';
 var REFRESH_EVERY_MS = 5 * 60 * 1000;
-var POLL_EVERY_MS = 3000;
-// The hub drops a client that is never authorized after a day.
-var CLIENT_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 // In step with the STATUS_* values in src/c/today.c.
 var STATUS = { OK: 0, CONNECTING: 1, PAIRING: 2, OFFLINE: 3 };
 
-var pairing = null; // { id, secret, verifier, clientId }
+var pairing = null; // { code, interval }
 var pollTimer = null;
 var busy = false;
 
@@ -46,12 +42,15 @@ function save(values) {
 }
 
 function signedIn() {
-  return !!load('refresh_token');
+  return !!load('session');
 }
 
 function signOut() {
-  save({ access_token: null, refresh_token: null, access_expires: null });
+  save({ access_token: null, session: null, access_expires: null });
 }
+
+// Before device login the watch held an OAuth refresh token and client.
+save({ refresh_token: null, client_id: null, client_created: null, client_used: null });
 
 /* ---------- HTTP ---------- */
 
@@ -140,10 +139,9 @@ function sendQr(url) {
 
 /* ---------- tokens ---------- */
 
-function storeTokens(data) {
+function storeAccess(data) {
   save({
     access_token: data.access_token,
-    refresh_token: data.refresh_token,
     access_expires: Date.now() + (data.expires_in || 3600) * 1000,
   });
 }
@@ -151,20 +149,13 @@ function storeTokens(data) {
 function refreshTokens(done) {
   request(
     'POST',
-    HUB + '/oauth/token',
-    {
-      form: {
-        grant_type: 'refresh_token',
-        refresh_token: load('refresh_token'),
-        client_id: load('client_id'),
-        resource: RESOURCE,
-      },
-    },
+    HUB + '/api/device/session/token',
+    { json: { refresh_token: load('session') } },
     function (status, data) {
       if (status === 200 && data && data.access_token) {
-        storeTokens(data);
+        storeAccess(data);
         done('ok');
-      } else if (status === 400 || status === 401) {
+      } else if (status === 401) {
         done('revoked');
       } else {
         done('offline');
@@ -211,36 +202,6 @@ function fetchPlan(retried) {
 
 /* ---------- pairing ---------- */
 
-function ensureClient(done) {
-  var id = load('client_id');
-  var age = Date.now() - Number(load('client_created') || 0);
-  if (id && (load('client_used') || age < CLIENT_MAX_AGE_MS)) return done(id);
-  request(
-    'POST',
-    HUB + '/oauth/register',
-    {
-      json: {
-        client_name: 'today for Pebble',
-        redirect_uris: [REDIRECT],
-        grant_types: ['authorization_code', 'refresh_token'],
-        response_types: ['code'],
-        token_endpoint_auth_method: 'none',
-        // The phone half can be torn down mid-refresh (a watch reboot does it),
-        // which would lose a rotated token and sign you out on the next launch.
-        refresh_token_rotation: false,
-      },
-    },
-    function (status, data) {
-      if (status === 201 && data && data.client_id) {
-        save({ client_id: data.client_id, client_created: Date.now(), client_used: null });
-        done(data.client_id);
-      } else {
-        done(null);
-      }
-    }
-  );
-}
-
 function stopPolling() {
   if (pollTimer) clearTimeout(pollTimer);
   pollTimer = null;
@@ -250,64 +211,42 @@ function stopPolling() {
 function startPairing() {
   stopPolling();
   sendStatus(STATUS.CONNECTING);
-  ensureClient(function (clientId) {
-    if (!clientId) return sendStatus(STATUS.OFFLINE);
-    request('POST', BASE + '/pair/new', { json: { client_id: clientId } }, function (status, data) {
-      if (status !== 200 || !data || !data.id) return sendStatus(STATUS.OFFLINE);
-      pairing = { id: data.id, secret: data.secret, verifier: data.verifier, clientId: clientId };
-      sendQr(data.url);
-      pollTimer = setTimeout(poll, POLL_EVERY_MS);
-    });
-  });
+  request(
+    'POST',
+    HUB + '/api/device',
+    { form: { client: 'device', device_name: 'pebble', resource: RESOURCE } },
+    function (status, data) {
+      if (status !== 200 || !data || !data.device_code) return sendStatus(STATUS.OFFLINE);
+      pairing = { code: data.device_code, interval: Math.max(data.interval || 5, 5) * 1000 };
+      sendQr(data.verification_uri_complete);
+      pollTimer = setTimeout(poll, pairing.interval);
+    }
+  );
 }
 
 function poll() {
   var current = pairing;
   if (!current) return;
-  request('POST', BASE + '/pair/poll', { json: { id: current.id, secret: current.secret } }, function (status, data) {
+  request('POST', HUB + '/api/device/token', { form: { device_code: current.code } }, function (status, data) {
     if (pairing !== current) return;
-    if (status === 200 && data && data.code) {
+    var error = data && data.error;
+    if (status === 200 && data && data.session) {
       stopPolling();
-      redeem(data.code, current);
-    } else if (status === 410) {
-      startPairing(); // the code on screen expired; show a fresh one
+      save({ session: data.session.refresh_token });
+      storeAccess(data);
+      fetchPlan();
+    } else if (status === 0 || status >= 500 || error === 'authorization_pending' || error === 'slow_down') {
+      pollTimer = setTimeout(poll, current.interval);
     } else {
-      pollTimer = setTimeout(poll, POLL_EVERY_MS);
+      startPairing(); // the code on screen expired or was refused; show a fresh one
     }
   });
 }
 
-function redeem(code, current) {
-  sendStatus(STATUS.CONNECTING);
-  request(
-    'POST',
-    HUB + '/oauth/token',
-    {
-      form: {
-        grant_type: 'authorization_code',
-        code: code,
-        redirect_uri: REDIRECT,
-        client_id: current.clientId,
-        code_verifier: current.verifier,
-        resource: RESOURCE,
-      },
-    },
-    function (status, data) {
-      if (status === 200 && data && data.access_token) {
-        storeTokens(data);
-        save({ client_used: 1 });
-        fetchPlan();
-      } else {
-        startPairing();
-      }
-    }
-  );
-}
-
 function unpair() {
-  var token = load('refresh_token');
-  if (token) {
-    request('POST', HUB + '/oauth/revoke', { form: { token: token, client_id: load('client_id') } }, function () {});
+  var session = load('session');
+  if (session) {
+    request('POST', HUB + '/api/device/session/revoke', { json: { refresh_token: session } }, function () {});
   }
   signOut();
   startPairing();
