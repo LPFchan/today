@@ -37,6 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Look for an update on every launch, on top of Sparkle's daily check.
         updater.updater.checkForUpdatesInBackground()
         Alerts.center?.delegate = self
+        model.onSignOut = { [weak self] in self?.showOnboarding(at: .signIn) }
         // `open Today.app --args --rehearse-first-launch` replays what a new user sees.
         if CommandLine.arguments.contains("--rehearse-first-launch") || !UserDefaults.standard.bool(forKey: "onboarded") {
             showOnboarding()
@@ -50,26 +51,38 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         [.banner, .sound]
     }
 
-    private func showOnboarding() {
+    private func showOnboarding(at step: Onboarding.Step = .welcome) {
+        if let window = onboardingWindow {
+            window.makeKeyAndOrderFront(nil)
+            NSApp.activate()
+            return
+        }
         let onboarding = Onboarding()
+        onboarding.step = step
+        onboarding.notify = model.notify
+        // A second run starts from how things are now.
+        if UserDefaults.standard.bool(forKey: "onboarded") {
+            onboarding.openAtLogin = SMAppService.mainApp.status == .enabled
+        }
         if model.session == .signedIn { model.refresh() }
         let window = OnboardingWindow(onboarding, model: model)
         onboarding.onFinish = { [weak self, weak onboarding] in
             guard let self, let onboarding else { return }
-            self.finishOnboarding(openAtLogin: onboarding.openAtLogin)
+            self.finishOnboarding(openAtLogin: onboarding.openAtLogin, notify: onboarding.notify)
         }
         onboardingWindow = window
         window.makeKeyAndOrderFront(nil)
         NSApp.activate()
     }
 
-    private func finishOnboarding(openAtLogin: Bool) {
+    private func finishOnboarding(openAtLogin: Bool, notify: Bool) {
         guard let window = onboardingWindow else { return }
         onboardingWindow = nil
         UserDefaults.standard.set(true, forKey: "onboarded")
-        if openAtLogin, SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
+        let service = SMAppService.mainApp
+        if openAtLogin != (service.status == .enabled) { try? openAtLogin ? service.register() : service.unregister() }
         window.close()
-        // Asked here rather than at launch so the prompt doesn't cover the wizard.
-        if model.notify { Alerts.ask() }
+        // Set after the wizard closes so macOS's permission prompt doesn't cover it.
+        model.notify = notify
     }
 }

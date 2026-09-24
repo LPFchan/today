@@ -9,6 +9,7 @@ final class Onboarding {
 
     var step = Step.welcome
     var openAtLogin = true
+    var notify = true
     @ObservationIgnored var onFinish: () -> Void = {}
 }
 
@@ -42,7 +43,7 @@ struct OnboardingView: View {
                 case .welcome: WelcomeStep()
                 case .signIn: SignInStep(model: model)
                 case .person: PersonStep(model: model)
-                case .done: DoneStep(openAtLogin: $onboarding.openAtLogin)
+                case .done: DoneStep(onboarding: onboarding)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -321,7 +322,7 @@ private struct PersonRow: View {
 /* ---------- done ---------- */
 
 private struct DoneStep: View {
-    @Binding var openAtLogin: Bool
+    @Bindable var onboarding: Onboarding
 
     var body: some View {
         VStack(spacing: 26) {
@@ -340,10 +341,13 @@ private struct DoneStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: 440)
-            Toggle("Open Today when I log in", isOn: $openAtLogin)
-                .toggleStyle(.switch)
-                .tint(accent)
-                .font(.system(size: 14, weight: .medium))
+            VStack(alignment: .leading, spacing: 12) {
+                Toggle("Notify me when anyone’s next item starts", isOn: $onboarding.notify)
+                Toggle("Open Today when I log in", isOn: $onboarding.openAtLogin)
+            }
+            .toggleStyle(.switch)
+            .tint(accent)
+            .font(.system(size: 14, weight: .medium))
         }
     }
 }

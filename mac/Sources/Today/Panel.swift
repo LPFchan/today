@@ -314,6 +314,12 @@ private struct MenuRows: View {
                 NSWorkspace.shared.open(Account.base)
             }
             .keyboardShortcut("o")
+            Row(title: "Check for Updates…") {
+                close()
+                NSApp.activate()
+                updater.checkForUpdates(nil)
+            }
+            separator
             Row(title: "Notify When Items Start", checked: model.notify) { model.notify.toggle() }
             Row(title: "Open at Login", checked: openAtLogin) {
                 let service = SMAppService.mainApp
@@ -325,19 +331,20 @@ private struct MenuRows: View {
                 }
                 openAtLogin = service.status == .enabled
             }
-            Row(title: "Check for Updates…") {
-                close()
-                NSApp.activate()
-                updater.checkForUpdates(nil)
-            }
+            separator
             if model.session == .signedIn {
-                Row(title: "Sign Out") { model.signOut() }
+                Row(title: "Sign Out") {
+                    close()
+                    model.signOut()
+                }
             }
             Row(title: "Quit Today", shortcut: "Q") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
         .padding(.horizontal, 6)
     }
+
+    private var separator: some View { Divider().padding(.horizontal, 8).padding(.vertical, 5) }
 
     private func close() { NSApp.keyWindow?.close() }
 }
