@@ -2,7 +2,8 @@
 
 A menu bar app that shows the time left on your current item, or a friend's
 (anyone who shares their day publicly). Click it for the rest of the day and
-to switch people.
+to switch people. It posts a notification whenever anyone's next item starts
+(a switch in the panel turns that off).
 
 ## How it signs in
 

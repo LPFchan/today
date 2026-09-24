@@ -28,7 +28,8 @@ flash-and-chime when an item ends.
   one hour axis, with what they're doing now.
 - Pebble app (`watch/`) — read-only timer for your own plan, paired by QR code.
 - Mac menu bar app (`mac/`) — read-only timer for you or anyone on the board,
-  signed in through the browser; updates itself with Sparkle.
+  signed in through the browser; notifies when anyone's next item starts;
+  updates itself with Sparkle.
 
 ## Invariants
 

@@ -314,6 +314,7 @@ private struct MenuRows: View {
                 NSWorkspace.shared.open(Account.base)
             }
             .keyboardShortcut("o")
+            Row(title: "Notify When Items Start", checked: model.notify) { model.notify.toggle() }
             Row(title: "Open at Login", checked: openAtLogin) {
                 let service = SMAppService.mainApp
                 do {

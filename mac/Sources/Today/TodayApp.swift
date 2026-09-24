@@ -2,6 +2,7 @@ import AppKit
 import ServiceManagement
 import Sparkle
 import SwiftUI
+import UserNotifications
 
 @main
 struct TodayApp: App {
@@ -27,7 +28,7 @@ struct TodayApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
     let model = Model()
     private(set) lazy var updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
     private var onboardingWindow: OnboardingWindow?
@@ -35,10 +36,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Look for an update on every launch, on top of Sparkle's daily check.
         updater.updater.checkForUpdatesInBackground()
+        Alerts.center?.delegate = self
         // `open Today.app --args --rehearse-first-launch` replays what a new user sees.
         if CommandLine.arguments.contains("--rehearse-first-launch") || !UserDefaults.standard.bool(forKey: "onboarded") {
             showOnboarding()
+        } else if model.notify {
+            Alerts.ask()
         }
+    }
+
+    // Show banners even while the panel is open and Today is the active app.
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+        [.banner, .sound]
     }
 
     private func showOnboarding() {
@@ -60,5 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         UserDefaults.standard.set(true, forKey: "onboarded")
         if openAtLogin, SMAppService.mainApp.status != .enabled { try? SMAppService.mainApp.register() }
         window.close()
+        // Asked here rather than at launch so the prompt doesn't cover the wizard.
+        if model.notify { Alerts.ask() }
     }
 }

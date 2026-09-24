@@ -16,8 +16,19 @@ final class Model {
     var selection = UserDefaults.standard.string(forKey: "person") ?? Person.meID {
         didSet { UserDefaults.standard.set(selection, forKey: "person") }
     }
+    /// Post a notification when anyone's next item starts.
+    var notify = UserDefaults.standard.object(forKey: "notify") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(notify, forKey: "notify")
+            if notify { Alerts.ask() }
+        }
+    }
 
     @ObservationIgnored private let live: Bool
+    /// When each person's running item started, as of the last tick; nil
+    /// until a board has loaded, so launching doesn't announce what's
+    /// already running.
+    @ObservationIgnored private var started: [String: Date]?
     @ObservationIgnored private var loading = false
     @ObservationIgnored private var lastTry = Date.distantPast
     @ObservationIgnored private var signIn: Task<Void, Never>?
@@ -45,6 +56,23 @@ final class Model {
         now = Date()
         // Plans change rarely; the timers run locally in between.
         if session == .signedIn, now.timeIntervalSince(lastTry) >= 60 { refresh() }
+        // You are always on a loaded board, so an empty one means none yet.
+        if session == .signedIn, !people.isEmpty { announce() } else { started = nil }
+    }
+
+    private func announce() {
+        var running: [String: Date] = [:]
+        for person in people {
+            guard case .active(let i) = Day(person.items, at: now) else { continue }
+            let item = person.items[i]
+            running[person.id] = item.start
+            // A friend's fresh plan can reach us up to a minute late; anything
+            // older than that was missed (asleep, say) and stays quiet.
+            if notify, let started, started[person.id] != item.start, now.timeIntervalSince(item.start) < 120 {
+                Alerts.started(item, by: person)
+            }
+        }
+        started = running
     }
 
     func refresh() {
