@@ -341,13 +341,26 @@ private struct DoneStep: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: 440)
-            VStack(alignment: .leading, spacing: 12) {
-                Toggle("Notify me when anyone’s next item starts", isOn: $onboarding.notify)
-                Toggle("Open Today when I log in", isOn: $onboarding.openAtLogin)
+            VStack(spacing: 12) {
+                Switch("Notify me when anyone’s next item starts", isOn: $onboarding.notify)
+                Switch("Open Today when I log in", isOn: $onboarding.openAtLogin)
             }
-            .toggleStyle(.switch)
-            .tint(accent)
-            .font(.system(size: 14, weight: .medium))
+            .frame(width: 380)
+        }
+    }
+}
+
+/// A label on the left, its switch lined up on the right.
+private struct Switch: View {
+    let title: String
+    @Binding var isOn: Bool
+    init(_ title: String, isOn: Binding<Bool>) { self.title = title; _isOn = isOn }
+
+    var body: some View {
+        HStack {
+            Text(title).font(.system(size: 14, weight: .medium))
+            Spacer()
+            Toggle(title, isOn: $isOn).labelsHidden().toggleStyle(.switch).tint(accent)
         }
     }
 }
