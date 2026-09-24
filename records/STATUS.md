@@ -7,17 +7,15 @@
 - Current focus: first real use by the operator and marie, on the web, the watch and the Mac
 - Highest-priority blocker: none
 - Next operator decision needed: none
-- Related decisions: DEC-20260923-001, DEC-20260923-002, DEC-20260923-003
+- Related decisions: DEC-20260923-003, DEC-20260925-001
 
 ## Current State Summary
 
 today.lost.plus is live behind the cloud Common Auth gateway: the `today`
 Worker (D1 `today`), hub registry row `today.lost.plus` (alias and scope
 `today`), and a proxied placeholder DNS record. The web app, the shared board
-and the watch pairing mailbox answer in production. The Pebble app builds for
-all seven platforms; pairing was checked against production up to the hub's
-login page, and the QR the emulator shows decodes to the pairing link. A full
-pairing needs a real account to approve it.
+answer in production. The Pebble app signs in through the hub's device login;
+Marie's watch is paired and reading its plan.
 
 The Mac menu bar app is released as mac-v1.0.0 (`today.dmg` on GitHub, Sparkle
 feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
@@ -31,11 +29,16 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 
 - Goal: the operator and marie use it daily, on the web and on the watch.
 - Status: `in progress`
-- Current work: first sign-ins; first real watch pairing.
+- Current work: first sign-ins.
 - Exit criteria: both have paired a watch, installed the Mac app, and shared their day publicly.
-- Related ids: DEC-20260923-001
+- Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-09-25:
+  - Change: the watch signs in through the hub's device login; today's `/pair` mailbox is gone.
+  - Why it matters: the watch stays signed in for a year of use, and today no longer handles sign-in.
+  - Related ids: DEC-20260925-001
 
 - 2026-09-23:
   - Change: Mac menu bar app, mac-v1.0.0; the gateway's `/api/board` became an `api` route.
@@ -72,7 +75,3 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
   - Trigger: mac-v1.0.0 is up.
   - Related ids: DEC-20260923-003
 
-- Next: pair a real watch end to end.
-  - Owner: operator
-  - Trigger: watch-v1.0.0 release is up.
-  - Related ids: DEC-20260923-001

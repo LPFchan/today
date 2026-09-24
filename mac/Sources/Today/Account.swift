@@ -5,10 +5,9 @@ import Network
 
 /// Signing in to lost.plus and reading the board.
 ///
-/// The app is an OAuth client of the auth hub, like the watch, but it can
-/// open a browser itself, so it needs no pairing mailbox: it registers a
-/// client, sends the browser to the hub's consent page, and catches the code
-/// on a loopback port (RFC 8252). The token is bound to today.lost.plus with
+/// The app is an OAuth client of the auth hub: it registers a client, sends
+/// the browser to the hub's consent page, and catches the code on a loopback
+/// port (RFC 8252). The token is bound to today.lost.plus with
 /// scope `today`; the gateway checks it on /api/board.
 enum Account {
     static let base = URL(string: "https://today.lost.plus")!

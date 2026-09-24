@@ -7,8 +7,7 @@ to switch people. It posts a notification whenever anyone's next item starts
 
 ## How it signs in
 
-It is an OAuth client of the auth hub, like the watch, but it can open a
-browser, so it skips the pairing mailbox: it registers a client, opens the
+It is an OAuth client of the auth hub: it registers a client, opens the
 hub's consent page, and catches the code on a loopback port
 (`http://127.0.0.1:<port>/callback`). The token is bound to
 `https://today.lost.plus/mcp` with scope `today` and reads only `/api/board`,

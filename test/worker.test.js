@@ -112,59 +112,6 @@ test('the watch gets epoch seconds and byte-bounded names', async () => {
   assert.ok(name.endsWith('…'));
 });
 
-test('pairing: new, open, done, poll', async () => {
-  const env = { DB: testDatabase() };
-  const call = client(env);
-
-  assert.equal((await call('POST', '/pair/new', { body: { client_id: 'nope' } })).status, 400);
-
-  const created = await call('POST', '/pair/new', { body: { client_id: 'lpc_' + 'a'.repeat(32) } });
-  assert.equal(created.status, 200);
-  const { id, secret, verifier, url } = created.body;
-  assert.match(id, /^[a-z0-9]{10}$/);
-  assert.equal(url, `${ORIGIN}/pair/${id}`);
-
-  // The QR link sends the browser to the hub with a matching PKCE challenge.
-  const open = await call('GET', `/pair/${id}`);
-  assert.equal(open.status, 302);
-  const authorize = new URL(open.headers.get('location'));
-  assert.equal(authorize.origin + authorize.pathname, 'https://auth.lost.plus/oauth/authorize');
-  assert.equal(authorize.searchParams.get('resource'), `${ORIGIN}/mcp`);
-  assert.equal(authorize.searchParams.get('scope'), 'today');
-  assert.equal(authorize.searchParams.get('state'), id);
-  const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
-  assert.equal(authorize.searchParams.get('code_challenge'), Buffer.from(digest).toString('base64url'));
-
-  assert.equal((await call('POST', '/pair/poll', { body: { id, secret } })).status, 202);
-  assert.equal((await call('POST', '/pair/poll', { body: { id, secret: 'wrong' } })).status, 403);
-
-  const done = await call('GET', `/pair/done?code=abc123&state=${id}`);
-  assert.equal(done.status, 200);
-  assert.match(done.headers.get('content-security-policy'), /frame-ancestors 'none'/);
-  // A second callback cannot replace the code.
-  assert.equal((await call('GET', `/pair/done?code=evil&state=${id}`)).status, 410);
-
-  const polled = await call('POST', '/pair/poll', { body: { id, secret } });
-  assert.deepEqual(polled.body, { code: 'abc123' });
-  // Taken once, then gone.
-  assert.equal((await call('POST', '/pair/poll', { body: { id, secret } })).status, 410);
-  assert.equal((await call('GET', `/pair/${id}`)).status, 410);
-});
-
-test('pairing ignores identity headers entirely', async () => {
-  const call = client({ DB: testDatabase() });
-  const created = await call('POST', '/pair/new', { headers: as('1', 'x'), body: { client_id: 'lpc_' + 'b'.repeat(32) } });
-  assert.equal(created.status, 200);
-});
-
-test('declining on the hub cancels the pairing', async () => {
-  const call = client({ DB: testDatabase() });
-  const { id, secret } = (await call('POST', '/pair/new', { body: { client_id: 'lpc_' + 'c'.repeat(32) } })).body;
-  const declined = await call('GET', `/pair/done?error=access_denied&state=${id}`);
-  assert.equal(declined.status, 200);
-  assert.equal((await call('POST', '/pair/poll', { body: { id, secret } })).status, 410);
-});
-
 test('the Mac download goes to the newest release in the Sparkle feed', async () => {
   const call = client({ DB: testDatabase() });
   const realFetch = globalThis.fetch;

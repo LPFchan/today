@@ -20,15 +20,13 @@ createServer(async (req, res) => {
   const headers = { ...req.headers };
   for (const key of Object.keys(headers)) if (key.startsWith('x-lost-plus-')) delete headers[key];
   delete headers.host;
-  if (!url.pathname.startsWith('/pair')) {
-    Object.assign(headers, {
-      'x-lost-plus-encoding': 'percent-utf8',
-      'x-lost-plus-sub': encodeURIComponent(`dev-${name}`),
-      'x-lost-plus-email': encodeURIComponent(`${name}@example.com`),
-      'x-lost-plus-name': encodeURIComponent(name),
-      'x-lost-plus-role': 'user',
-    });
-  }
+  Object.assign(headers, {
+    'x-lost-plus-encoding': 'percent-utf8',
+    'x-lost-plus-sub': encodeURIComponent(`dev-${name}`),
+    'x-lost-plus-email': encodeURIComponent(`${name}@example.com`),
+    'x-lost-plus-name': encodeURIComponent(name),
+    'x-lost-plus-role': 'user',
+  });
 
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : req;
   const upstream = await fetch(UPSTREAM + req.url, { method: req.method, headers, body, duplex: 'half', redirect: 'manual' });

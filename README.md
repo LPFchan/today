@@ -15,7 +15,7 @@ Based on marie's `오늘 흐름`.
 
 | Path | What |
 | --- | --- |
-| `src/worker.js` | Cloudflare Worker: API, board, watch feed, watch pairing |
+| `src/worker.js` | Cloudflare Worker: API, board, watch feed |
 | `public/` | the web app (plain HTML/CSS/JS, no build) and the shared schedule parser |
 | `migrations/` | D1 schema |
 | `watch/` | Pebble app (C on the watch, PebbleKit JS on the phone) |
