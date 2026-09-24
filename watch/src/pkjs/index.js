@@ -10,8 +10,8 @@
 //   4. poll POST /pair/poll until the hub's code arrives, then redeem it with
 //      the verifier at the hub's token endpoint
 // The token is bound to today.lost.plus with scope `today`, so it can read your
-// plan and nothing else. Tokens rotate on refresh and live in this app's
-// localStorage.
+// plan and nothing else. The refresh token doesn't rotate (see ensureClient)
+// and lives in this app's localStorage.
 
 var qrcode = require('qrcode-generator');
 
@@ -225,6 +225,9 @@ function ensureClient(done) {
         grant_types: ['authorization_code', 'refresh_token'],
         response_types: ['code'],
         token_endpoint_auth_method: 'none',
+        // The phone half can be torn down mid-refresh (a watch reboot does it),
+        // which would lose a rotated token and sign you out on the next launch.
+        refresh_token_rotation: false,
       },
     },
     function (status, data) {
