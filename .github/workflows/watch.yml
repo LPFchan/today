@@ -38,6 +38,8 @@ jobs:
       - name: Build
         working-directory: watch
         run: |
+          # The phone shows package.json's version; a release takes the tag's.
+          if [[ "$GITHUB_REF" == refs/tags/watch-v* ]]; then npm pkg set version="${GITHUB_REF_NAME#watch-v}"; fi
           pebble build
           cp build/watch.pbw ../today.pbw
       - uses: actions/upload-artifact@v4
