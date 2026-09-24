@@ -32,8 +32,9 @@ final class Model {
     @ObservationIgnored private var loading = false
     @ObservationIgnored private var lastTry = Date.distantPast
     @ObservationIgnored private var signIn: Task<Void, Never>?
-    /// The app delegate walks you back through signing in.
-    @ObservationIgnored var onSignOut: () -> Void = {}
+    /// Opens the onboarding window, where signing in happens; the app
+    /// delegate fills it in.
+    @ObservationIgnored var onboard: () -> Void = {}
 
     /// `live: false` makes a model that never ticks or fetches, for snapshots.
     init(live: Bool = true) {
@@ -129,6 +130,6 @@ final class Model {
         updated = nil
         problem = nil
         Task { await Account.signOut() }
-        onSignOut()
+        onboard()
     }
 }

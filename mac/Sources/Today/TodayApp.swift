@@ -37,9 +37,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         // Look for an update on every launch, on top of Sparkle's daily check.
         updater.updater.checkForUpdatesInBackground()
         Alerts.center?.delegate = self
-        model.onSignOut = { [weak self] in self?.showOnboarding(at: .signIn) }
+        model.onboard = { [weak self] in self?.showOnboarding() }
         // `open Today.app --args --rehearse-first-launch` replays what a new user sees.
-        if CommandLine.arguments.contains("--rehearse-first-launch") || !UserDefaults.standard.bool(forKey: "onboarded") {
+        // Signed out counts as new too: signing in only happens in the wizard.
+        if CommandLine.arguments.contains("--rehearse-first-launch") || !UserDefaults.standard.bool(forKey: "onboarded") || model.session == .signedOut {
             showOnboarding()
         } else if model.notify {
             Alerts.ask()
@@ -51,14 +52,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         [.banner, .sound]
     }
 
-    private func showOnboarding(at step: Onboarding.Step = .welcome) {
+    private func showOnboarding() {
         if let window = onboardingWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate()
             return
         }
         let onboarding = Onboarding()
-        onboarding.step = step
         onboarding.notify = model.notify
         // A second run starts from how things are now.
         if UserDefaults.standard.bool(forKey: "onboarded") {

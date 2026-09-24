@@ -41,7 +41,10 @@ struct Panel: View {
                     Placeholder(text: model.problem ?? "Loading…")
                 }
             case .signedOut, .signingIn:
-                SignInCard(model: model)
+                SignInCard(model: model) {
+                    NSApp.keyWindow?.close()
+                    model.onboard()
+                }
             }
             Divider().padding(.horizontal, 14).padding(.vertical, 6)
             MenuRows(model: model, updater: updater)
@@ -273,8 +276,10 @@ private struct Placeholder: View {
 
 /* ---------- signed out ---------- */
 
+/// Signing in happens in the onboarding window; this just leads there.
 private struct SignInCard: View {
     let model: Model
+    let signIn: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -285,16 +290,9 @@ private struct SignInCard: View {
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            if model.session == .signingIn {
-                HStack(spacing: 8) {
-                    ProgressView().controlSize(.small)
-                    Button("Cancel") { model.cancelSignIn() }
-                }
-            } else {
-                Button("Sign In…") { model.startSignIn() }
-                    .buttonStyle(.borderedProminent)
-                    .tint(accent)
-            }
+            Button("Sign In…", action: signIn)
+                .buttonStyle(.borderedProminent)
+                .tint(accent)
         }
         .padding(.horizontal, 16)
     }
@@ -314,10 +312,11 @@ private struct MenuRows: View {
                 NSWorkspace.shared.open(Account.base)
             }
             .keyboardShortcut("o")
-            Row(title: "Check for Updates…") {
-                close()
-                NSApp.activate()
-                updater.checkForUpdates(nil)
+            if model.session == .signedIn {
+                Row(title: "Sign Out") {
+                    close()
+                    model.signOut()
+                }
             }
             separator
             Row(title: "Notify When Items Start", checked: model.notify) { model.notify.toggle() }
@@ -332,11 +331,10 @@ private struct MenuRows: View {
                 openAtLogin = service.status == .enabled
             }
             separator
-            if model.session == .signedIn {
-                Row(title: "Sign Out") {
-                    close()
-                    model.signOut()
-                }
+            Row(title: "Check for Updates…") {
+                close()
+                NSApp.activate()
+                updater.checkForUpdates(nil)
             }
             Row(title: "Quit Today", shortcut: "Q") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
