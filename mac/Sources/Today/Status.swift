@@ -21,22 +21,22 @@ struct Status {
             let item = items[i]
             self.item = item
             title = item.name
-            left = "\(Format.left(item.end.timeIntervalSince(now))) left"
+            left = "\(Format.left(item.end.timeIntervalSince(now))) \(L10n.tr("left"))"
             countdown = Format.countdown(item.end.timeIntervalSince(now))
             remaining = item.end.timeIntervalSince(now) / max(1, item.end.timeIntervalSince(item.start))
             next = items.indices.contains(i + 1) ? items[i + 1] : nil
         case .waiting(let i), .onBreak(let i):
             let item = items[i]
             self.item = nil
-            title = day == .waiting(i) ? "Not started yet" : "On a break"
-            left = "in \(Format.left(item.start.timeIntervalSince(now)))"
+            title = day == .waiting(i) ? L10n.tr("Not started yet") : L10n.tr("On a break")
+            left = "\(L10n.tr("in")) \(Format.left(item.start.timeIntervalSince(now)))"
             countdown = Format.countdown(item.start.timeIntervalSince(now))
             remaining = nil
             next = item
         case .finished:
-            (item, title, left, countdown, remaining, next) = (nil, "Done for the day", nil, nil, nil, nil)
+            (item, title, left, countdown, remaining, next) = (nil, L10n.tr("Done for the day"), nil, nil, nil, nil)
         case .empty:
-            (item, title, left, countdown, remaining, next) = (nil, "No plan today", nil, nil, nil, nil)
+            (item, title, left, countdown, remaining, next) = (nil, L10n.tr("No plan today"), nil, nil, nil, nil)
         }
     }
 

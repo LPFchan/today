@@ -18,7 +18,7 @@ struct MenuBarLabel: View {
             let status = Status(person.items, at: model.now)
             return StatusIcon.image(remaining: status.remaining, countdown: status.countdown, dimmed: !status.isActive)
         }()
-        Image(nsImage: image).accessibilityLabel("Today")
+        Image(nsImage: image).accessibilityLabel(L10n.tr("Today"))
     }
 }
 
@@ -38,7 +38,7 @@ struct Panel: View {
                 if let person = model.person {
                     PersonCard(person: person, model: model)
                 } else {
-                    Placeholder(text: model.problem ?? "Loading…")
+                    Placeholder(text: model.problem ?? L10n.tr("Loading…"))
                 }
             case .signedOut, .signingIn:
                 SignInCard(model: model) {
@@ -68,7 +68,7 @@ private struct PeopleTabs: View {
                 Button { model.selection = person.id } label: {
                     VStack(spacing: 3) {
                         Avatar(name: person.name, selected: selected)
-                        Text(person.me ? "You" : person.name)
+                        Text(person.me ? L10n.tr("You") : person.name)
                             .font(.system(size: 11, weight: selected ? .semibold : .regular))
                             .lineLimit(1)
                             .truncationMode(.tail)
@@ -84,7 +84,7 @@ private struct PeopleTabs: View {
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
-                .help(person.me ? "Your timer" : "\(person.name)’s timer")
+                .help(person.me ? L10n.tr("Your timer") : person.name + L10n.tr("’s timer"))
             }
         }
         .padding(.horizontal, 10)
@@ -116,10 +116,10 @@ private struct PersonCard: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline) {
-                    Text(person.me ? "You" : person.name).font(.system(size: 15, weight: .semibold))
+                    Text(person.me ? L10n.tr("You") : person.name).font(.system(size: 15, weight: .semibold))
                     Spacer()
                     if person.me {
-                        Text(person.visibility == "public" ? "Shared" : "Only you")
+                        Text(person.visibility == "public" ? L10n.tr("Shared") : L10n.tr("Only you"))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -149,18 +149,18 @@ private struct PersonCard: View {
                 }
                 if let item = status.item, let remaining = status.remaining {
                     Bar(fraction: 1 - remaining)
-                    Caption(text: Format.range(item) + (status.next.map { " · Next \(Format.clock($0.start)) \($0.name)" } ?? ""))
+                    Caption(text: Format.range(item) + (status.next.map { " · \(L10n.tr("Next")) \(Format.clock($0.start)) \($0.name)" } ?? ""))
                 } else if let next = status.next {
-                    Caption(text: "Next · \(Format.clock(next.start)) \(next.name)")
+                    Caption(text: "\(L10n.tr("Next")) · \(Format.clock(next.start)) \(next.name)")
                 }
             }
 
             if let first = person.items.first, let last = person.items.last {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .firstTextBaseline) {
-                        Text("Today").font(.system(size: 13, weight: .semibold))
+                        Text(L10n.tr("Today")).font(.system(size: 13, weight: .semibold))
                         Spacer()
-                        Text("\(person.items.filter { now >= $0.end }.count) of \(person.items.count) done")
+                        Text(String(format: L10n.tr("%lld of %lld done"), person.items.filter { now >= $0.end }.count, person.items.count))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
@@ -175,9 +175,9 @@ private struct PersonCard: View {
 
     private func updatedText(_ now: Date) -> String {
         if let problem = model.problem { return problem }
-        guard let updated = model.updated else { return "Updating…" }
+        guard let updated = model.updated else { return L10n.tr("Updating…") }
         let seconds = now.timeIntervalSince(updated)
-        return seconds < 60 ? "Updated just now" : "Updated \(Int(seconds / 60)) min ago"
+        return seconds < 60 ? L10n.tr("Updated just now") : String(format: L10n.tr("Updated %lld min ago"), Int(seconds / 60))
     }
 }
 
@@ -199,7 +199,7 @@ private struct Upcoming: View {
                     }
                 }
                 let more = items.filter { $0.start > now }.count - rest.count
-                if more > 0 { Caption(text: "+\(more) more") }
+                if more > 0 { Caption(text: String(format: L10n.tr("+%lld more"), more)) }
             }
         }
     }
@@ -283,14 +283,14 @@ private struct SignInCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Sign in to see your timer").font(.system(size: 15, weight: .semibold))
+            Text(L10n.tr("Sign in to see your timer")).font(.system(size: 15, weight: .semibold))
             Text(model.session == .signingIn
-                 ? "Finish signing in in your browser."
-                 : (model.problem ?? "Today reads your plan, and the plans friends share, from your lost.plus account."))
+                 ? L10n.tr("Finish signing in in your browser.")
+                 : (model.problem ?? L10n.tr("Today reads your plan, and the plans friends share, from your lost.plus account.")))
                 .font(.system(size: 12))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Sign In…", action: signIn)
+            Button(L10n.tr("Sign In…"), action: signIn)
                 .buttonStyle(.borderedProminent)
                 .tint(accent)
         }
@@ -307,20 +307,20 @@ private struct MenuRows: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Row(title: "Open today.lost.plus", shortcut: "O") {
+            Row(title: L10n.tr("Open today.lost.plus"), shortcut: "O") {
                 close()
                 NSWorkspace.shared.open(Account.base)
             }
             .keyboardShortcut("o")
             if model.session == .signedIn {
-                Row(title: "Sign Out") {
+                Row(title: L10n.tr("Sign Out")) {
                     close()
                     model.signOut()
                 }
             }
             separator
-            Row(title: "Notify When Items Start", checked: model.notify) { model.notify.toggle() }
-            Row(title: "Open at Login", checked: openAtLogin) {
+            Row(title: L10n.tr("Notify When Items Start"), checked: model.notify) { model.notify.toggle() }
+            Row(title: L10n.tr("Open at Login"), checked: openAtLogin) {
                 let service = SMAppService.mainApp
                 do {
                     if service.status == .enabled { try service.unregister() } else { try service.register() }
@@ -331,12 +331,12 @@ private struct MenuRows: View {
                 openAtLogin = service.status == .enabled
             }
             separator
-            Row(title: "Check for Updates…") {
+            Row(title: L10n.tr("Check for Updates…")) {
                 close()
                 NSApp.activate()
                 updater.checkForUpdates(nil)
             }
-            Row(title: "Quit Today", shortcut: "Q") { NSApp.terminate(nil) }
+            Row(title: L10n.tr("Quit Today"), shortcut: "Q") { NSApp.terminate(nil) }
                 .keyboardShortcut("q")
         }
         .padding(.horizontal, 6)

@@ -17,7 +17,9 @@ enum Alerts {
         guard let center else { return }
         let content = UNMutableNotificationContent()
         content.title = person.me ? item.name : person.name
-        content.body = person.me ? "Until \(Format.clock(item.end))" : "\(item.name) until \(Format.clock(item.end))"
+        content.body = person.me
+            ? String(format: L10n.tr("Until %@"), Format.clock(item.end))
+            : String(format: L10n.tr("%@ until %@"), item.name, Format.clock(item.end))
         content.sound = .default
         center.add(UNNotificationRequest(identifier: "\(person.id) \(item.start.timeIntervalSince1970)", content: content, trigger: nil))
     }

@@ -77,18 +77,18 @@ struct OnboardingView: View {
     @ViewBuilder private var primaryButton: some View {
         switch onboarding.step {
         case .welcome:
-            PrimaryButton("Get Started") { next() }
+            PrimaryButton(L10n.tr("Get Started")) { next() }
         case .signIn:
             switch model.session {
-            case .signedIn: PrimaryButton("Continue") { next() }
-            case .signingIn: PrimaryButton("Waiting for your browser…") {}.disabled(true)
-            case .signedOut: PrimaryButton("Sign In with lost.plus") { model.startSignIn() }
+            case .signedIn: PrimaryButton(L10n.tr("Continue")) { next() }
+            case .signingIn: PrimaryButton(L10n.tr("Waiting for your browser…")) {}.disabled(true)
+            case .signedOut: PrimaryButton(L10n.tr("Sign In with lost.plus")) { model.startSignIn() }
             }
         case .person:
-            PrimaryButton("Continue") { next() }
+            PrimaryButton(L10n.tr("Continue")) { next() }
                 .disabled(model.people.isEmpty)
         case .done:
-            PrimaryButton("Done") { onboarding.onFinish() }
+            PrimaryButton(L10n.tr("Done")) { onboarding.onFinish() }
         }
     }
 
@@ -139,10 +139,10 @@ private struct WelcomeStep: View {
     var body: some View {
         VStack(spacing: 26) {
             Image(nsImage: NSApp.applicationIconImage).resizable().frame(width: 84, height: 84)
-            Header(title: "Welcome to Today", subtitle: "Your plan’s timer, right in the menu bar.")
+            Header(title: L10n.tr("Welcome to Today"), subtitle: L10n.tr("Your plan’s timer, right in the menu bar."))
             VStack(spacing: 14) {
                 TimerPreview()
-                Note("Or a friend’s, when they share their day.")
+                Note(L10n.tr("Or a friend’s, when they share their day."))
             }
         }
     }
@@ -181,7 +181,7 @@ private struct TimerPreview: View {
                     HStack(alignment: .firstTextBaseline) {
                         Text(Self.item.name).font(.system(size: 20, weight: .semibold))
                         Spacer()
-                        Text("\(Format.left(left)) left").font(.system(size: 15)).monospacedDigit().foregroundStyle(.secondary)
+                        Text("\(Format.left(left)) \(L10n.tr("left"))").font(.system(size: 15)).monospacedDigit().foregroundStyle(.secondary)
                     }
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
@@ -190,7 +190,7 @@ private struct TimerPreview: View {
                         }
                     }
                     .frame(height: 8)
-                    Text("09:00–10:30 · Next 10:30 Email").font(.system(size: 13)).foregroundStyle(.secondary)
+                    Text("09:00–10:30 · \(L10n.tr("Next")) 10:30 Email").font(.system(size: 13)).foregroundStyle(.secondary)
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 16)
@@ -224,22 +224,22 @@ private struct SignInStep: View {
     var body: some View {
         VStack(spacing: 26) {
             Symbol("person.crop.circle.badge.checkmark")
-            Header(title: "Sign in to lost.plus",
-                   subtitle: "Today reads your plan, and the plans friends share, from your lost.plus account. It can’t change anything.")
+            Header(title: L10n.tr("Sign in to lost.plus"),
+                   subtitle: L10n.tr("Today reads your plan, and the plans friends share, from your lost.plus account. It can’t change anything."))
             Group {
                 switch model.session {
                 case .signedIn:
-                    Label("Signed in", systemImage: "checkmark.circle.fill").foregroundStyle(accent)
+                    Label(L10n.tr("Signed in"), systemImage: "checkmark.circle.fill").foregroundStyle(accent)
                 case .signingIn:
                     VStack(spacing: 10) {
                         HStack(spacing: 8) {
                             ProgressView().controlSize(.small)
-                            Text("Finish signing in in your browser.").foregroundStyle(.secondary)
+                            Text(L10n.tr("Finish signing in in your browser.")).foregroundStyle(.secondary)
                         }
-                        Button("Cancel") { model.cancelSignIn() }.buttonStyle(.link)
+                        Button(L10n.tr("Cancel")) { model.cancelSignIn() }.buttonStyle(.link)
                     }
                 case .signedOut:
-                    Text(model.problem ?? "Your browser opens to sign in.")
+                    Text(model.problem ?? L10n.tr("Your browser opens to sign in."))
                         .foregroundStyle(model.problem == nil ? Color.secondary : Color.red)
                 }
             }
@@ -258,8 +258,8 @@ private struct PersonStep: View {
     var body: some View {
         VStack(spacing: 22) {
             Symbol("person.2.fill")
-            Header(title: "Whose timer?",
-                   subtitle: "Pick whose timer sits in your menu bar. You can switch any time from the menu.")
+            Header(title: L10n.tr("Whose timer?"),
+                   subtitle: L10n.tr("Pick whose timer sits in your menu bar. You can switch any time from the menu."))
             if model.people.isEmpty {
                 ProgressView().controlSize(.small)
             } else {
@@ -275,8 +275,8 @@ private struct PersonStep: View {
                 .scrollBounceBehavior(.basedOnSize)
                 .frame(width: 420, height: 176)
                 Note(model.people.count > 1
-                     ? "Friends show up here while they share their day publicly."
-                     : "Nobody else is sharing yet. Friends show up here when they do.")
+                     ? L10n.tr("Friends show up here while they share their day publicly.")
+                     : L10n.tr("Nobody else is sharing yet. Friends show up here when they do."))
             }
         }
     }
@@ -298,7 +298,7 @@ private struct PersonRow: View {
                     .background(accent.opacity(0.14), in: .circle)
                     .foregroundStyle(accent)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(person.me ? "You" : person.name).font(.system(size: 14, weight: .semibold))
+                    Text(person.me ? L10n.tr("You") : person.name).font(.system(size: 14, weight: .semibold))
                     Text([status.title, status.left].compactMap { $0 }.joined(separator: " · "))
                         .font(.system(size: 12))
                         .foregroundStyle(.secondary)
@@ -327,23 +327,23 @@ private struct DoneStep: View {
     var body: some View {
         VStack(spacing: 26) {
             Symbol("checkmark.seal.fill")
-            Header(title: "You’re all set",
-                   subtitle: "The ring empties as the current item runs out; the time next to it is what’s left.")
+            Header(title: L10n.tr("You’re all set"),
+                   subtitle: L10n.tr("The ring empties as the current item runs out; the time next to it is what’s left."))
             HStack(spacing: 10) {
                 Image(nsImage: StatusIcon.image(remaining: 0.3, countdown: "23:14"))
                     .renderingMode(.template)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(.secondary.opacity(0.15), in: .rect(cornerRadius: 6))
-                Text("Today lives in the menu bar. Click it to see the rest of the day or switch people.")
+                Text(L10n.tr("Today lives in the menu bar. Click it to see the rest of the day or switch people."))
                     .font(.system(size: 14))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: 440)
             VStack(spacing: 12) {
-                Switch("Notify me when anyone’s next item starts", isOn: $onboarding.notify)
-                Switch("Open Today when I log in", isOn: $onboarding.openAtLogin)
+                Switch(L10n.tr("Notify me when anyone’s next item starts"), isOn: $onboarding.notify)
+                Switch(L10n.tr("Open Today when I log in"), isOn: $onboarding.openAtLogin)
             }
             .frame(width: 380)
         }
