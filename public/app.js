@@ -452,6 +452,22 @@ function renderBoard() {
 
 /* ---------- editor ---------- */
 
+/**
+ * Close a dialog when the backdrop is pressed, but not when a press that
+ * started inside the dialog is released on the backdrop (e.g. selecting text
+ * in the textarea and letting go outside it).
+ */
+function armBackdropClose(dialog) {
+  let pressedOnBackdrop = false;
+  dialog.addEventListener('pointerdown', (event) => {
+    pressedOnBackdrop = event.target === dialog;
+  });
+  dialog.addEventListener('pointerup', (event) => {
+    if (pressedOnBackdrop && event.target === dialog) dialog.close();
+    pressedOnBackdrop = false;
+  });
+}
+
 /** A translated string as nodes, with {placeholders} replaced by elements. */
 function fill(key, nodes) {
   return t(key, Object.fromEntries(Object.keys(nodes).map((name) => [name, `{${name}}`])))
@@ -721,9 +737,7 @@ el.writeButton.addEventListener('click', openEditor);
 el.editButton.addEventListener('click', openEditor);
 el.visibilityPill.addEventListener('click', openEditor);
 el.closeEditor.addEventListener('click', () => el.editor.close());
-el.editor.addEventListener('click', (event) => {
-  if (event.target === el.editor) el.editor.close();
-});
+armBackdropClose(el.editor);
 el.editorForm.addEventListener('submit', (event) => {
   event.preventDefault();
   requestStart(el.planInput.value);
@@ -766,9 +780,7 @@ el.shiftDialog.addEventListener('close', () => (state.pendingStart = null));
 
 el.appsButton.addEventListener('click', () => el.appsDialog.showModal());
 el.closeApps.addEventListener('click', () => el.appsDialog.close());
-el.appsDialog.addEventListener('click', (event) => {
-  if (event.target === el.appsDialog) el.appsDialog.close();
-});
+armBackdropClose(el.appsDialog);
 el.fullscreenButton.addEventListener('click', toggleFullscreen);
 
 document.addEventListener('click', (event) => {
