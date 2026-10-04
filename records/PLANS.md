@@ -32,7 +32,7 @@ Who owns what:
 | Repo | Owns |
 | --- | --- |
 | today | the routine, window items, per-item status, keepout state, away mode and affordance API, web UI, Mac overlay |
-| brief | proofs and alarms: wake-up audio over SSH (MacBook, then dumpling), meal photo judging with calorie estimate, Find My away-from-home check, Roborock check, reporting misses and bypasses |
+| brief | proofs and alarms: wake-up audio over SSH (MacBook, then dumpling), meal photo judging with calorie estimate, Find My away-from-home check, starting the Roborock when you leave and checking it finished, reporting misses and bypasses |
 | findmy-cli fork | findmy-mcp, hosted persistently on dumpling |
 | setup | one shared keepout check called by every coding harness's hook, plus the line in the global agent instructions |
 | auth | gateway routes and tokens for the new callers: the Mac app marking items started or done, brief posting proofs, Hermes granting affordances, the keepout check reading state |
@@ -46,7 +46,10 @@ the board, the watch or the Mac app.
 ### Near Term
 
 - Phase 0 — Roborock on its own schedule:
-  - Why now: no code; set a daily run in the Roborock app during the evening outing.
+  - Why now: no code; set a daily run in the Roborock app inside the evening
+    outing window. Sunset moves through the year (Seoul: about 17:15 in
+    December, 19:55 in June), so the time needs nudging every couple of
+    months until phase 5 replaces it.
   - Dependencies: none (operator, in the app).
   - Related ids: DEC-20261005-001
 - Phase 1 — routine and keepout state in today:
@@ -93,7 +96,10 @@ the board, the watch or the Mac app.
     service credential that let brief write proof results for the operator.
   - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
     calorie estimate); 30+ minutes away from home via Find My; results posted
-    to today to lift the lock.
+    to today to lift the lock. When Find My sees the operator leave home for
+    the outing, brief starts the Roborock through python-roborock (the
+    library Home Assistant uses) and checks the run finished; the app's fixed
+    schedule from phase 0 is then removed.
   - Related ids: DEC-20261005-001
 - Phase 6 — away mode and affordances:
   - Why later: bypasses matter once the lock is real.
@@ -102,11 +108,4 @@ the board, the watch or the Mac app.
   - Scope: away mode set at least a day ahead; a Hermes tool that grants one
     item for today only, with a guideline to weigh the request; brief reports
     misses and bypasses each morning.
-  - Related ids: DEC-20261005-001
-
-### Deferred But Accepted
-
-- Roborock verification in brief:
-  - Why deferred: the app's own schedule covers it until a run gets missed unnoticed.
-  - Revisit trigger: phase 5 done, or a missed run.
   - Related ids: DEC-20261005-001
