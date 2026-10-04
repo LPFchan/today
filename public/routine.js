@@ -3,7 +3,7 @@
 //   12:00-12:20 Hygiene ! until done
 //   12:30..14:00 Meal ! until photo; min 20m
 //   sunset-1h..sunset Outing ! until away 30m, photo
-//   02:30-12:00 Sleep !
+//   03:00-12:00 Sleep !
 //
 // Blank lines and # notes are ignored. Starts roll past midnight after noon,
 // like schedule.js. Windows open at their start and lock at their deadline.
@@ -15,9 +15,9 @@ export const DEFAULT_ROUTINE = `12:00-12:20 wake up, wash face, brush teeth ! un
 12:30..14:00 lunch ! until photo; min 20m
 14:00-sunset-1h free time
 sunset-1h..sunset evening outing and dinner ! until away 30m, photo
-sunset-02:00 free time
-02:00-02:30 wash face, brush teeth ! until done
-02:30-12:00 sleep !`;
+sunset-02:30 free time
+02:30-03:00 wash face, brush teeth ! until done
+03:00-12:00 sleep !`;
 
 const MINUTE = 60_000;
 const DAY = 1440;

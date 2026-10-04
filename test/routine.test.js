@@ -93,7 +93,10 @@ test('default routine parses and rolls its overnight items into tomorrow', () =>
   assert.equal(items.length, 7);
   assert.equal(items[1].name, 'lunch');
   const day = placeRoutine(items, '2026-10-05');
-  assert.equal(day.items[5].start, at(day, 26));
+  assert.equal(day.items[4].end, at(day, 26, 30));
+  assert.equal(day.items[5].start, at(day, 26, 30));
+  assert.equal(day.items[5].end, at(day, 27));
+  assert.equal(day.items[6].start, at(day, 27));
   assert.equal(day.items[6].end, at(day, 36));
   assert.equal(day.ends, at(day, 36));
   const tomorrow = placeRoutine(items, '2026-10-06');
