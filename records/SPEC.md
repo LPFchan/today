@@ -4,8 +4,8 @@
 - Canonical repo: https://github.com/LPFchan/today
 - Project id: today
 - Operator: LPFchan (yeowool)
-- Last updated: 2026-09-23
-- Related decisions: DEC-20260923-001, DEC-20260923-003
+- Last updated: 2026-10-05
+- Related decisions: DEC-20260923-001, DEC-20260923-003, DEC-20261005-001, DEC-20261005-002
 
 ## Thesis
 
@@ -26,6 +26,10 @@ flash-and-chime when an item ends.
   screen.
 - `today.lost.plus/everyone` — a shared timeline: every public person's day on
   one hour axis, with what they're doing now.
+- `today.lost.plus/routine` — auto-routine, opt-in and unlinked: a recurring
+  routine (`public/routine.js` format) that writes each day's plan, with
+  keepout items that lock until done. Turning it on is self-serve; turning
+  it off goes through Hermes.
 - Pebble app (`watch/`) — read-only timer for your own plan, paired by QR code.
 - Mac menu bar app (`mac/`) — read-only timer for you or anyone on the board,
   signed in through the browser; notifies when anyone's next item starts;
@@ -40,7 +44,12 @@ flash-and-chime when an item ends.
   `private` (only you). New people start `private`.
 - The schedule text is the stored truth. `public/schedule.js` parses it in
   both the browser and the Worker; times count in minutes from the local
-  midnight the plan was started from (`anchor`, epoch ms).
+  midnight the plan was started from (`anchor`, epoch ms). For someone with
+  auto-routine on, each new routine day overwrites the plan from the
+  routine; edits to the plan stick until the next day.
+- Auto-routine is per person and off by default. People without it see no
+  difference anywhere. Keepout state and progress are private to their
+  owner; the board shows only the plan.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
   tokens for resource `https://today.lost.plus/mcp`, scope `today`; the
   gateway accepts those only on `/api/watch` and `/api/board`.
@@ -50,4 +59,5 @@ flash-and-chime when an item ends.
 
 - Editing from the watch or the Mac app.
 - Friend lists, unlisted links, or per-person sharing.
-- History of past days. A plan is replaced when you start a new one.
+- History of past days. A plan is replaced when you start a new one;
+  auto-routine keeps only today's and yesterday's item progress.
