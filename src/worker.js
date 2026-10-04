@@ -70,6 +70,7 @@ async function api(request, env, url) {
     case 'PUT /api/schedule':
       return saveSchedule(request, env, me);
     case 'DELETE /api/schedule':
+      await currentRoutine(env, me);
       await upsertPerson(env, me, { schedule: '', anchor: 0 });
       return json(200, await profile(env, me));
     case 'PUT /api/visibility':
@@ -148,6 +149,7 @@ async function saveSchedule(request, env, me) {
     throw error;
   }
   if (!items.length) return json(422, { error: 'empty', line: 0 });
+  await currentRoutine(env, me);
   await upsertPerson(env, me, { schedule: serializeSchedule(items), anchor: body.anchor });
   return json(200, await profile(env, me));
 }

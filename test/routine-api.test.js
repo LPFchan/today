@@ -282,6 +282,32 @@ test('concurrent rollover reads claim the day once and preserve a manual save be
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
 });
 
+test('a manual save as the first request of a new routine day survives rollover', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  at('12:00', '2026-10-06');
+  const manual = { text: '13:00-14:00 Manual', anchor: instant('00:00', '2026-10-06') };
+  const saved = await call('PUT', '/api/schedule', manual);
+  assert.equal(saved.status, 200);
+  assert.deepEqual(saved.body.schedule, manual);
+  assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, manual);
+  await call('GET', '/api/routine');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, manual);
+});
+
+test('clearing the schedule as the first request of a new routine day survives rollover', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  at('12:00', '2026-10-06');
+  const cleared = await call('DELETE', '/api/schedule');
+  assert.equal(cleared.status, 200);
+  assert.equal(cleared.body.schedule, null);
+  assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+  assert.equal((await call('GET', '/api/me')).body.schedule, null);
+  assert.deepEqual((await call('GET', '/api/watch')).body.items, []);
+});
+
 test('manual edits survive until the instance changes at its first start', async (t) => {
   const { enable, call, at } = setup(t);
   await enable();
