@@ -59,6 +59,19 @@ test('sunset offsets and range separators are unambiguous', () => {
   assert.equal(parseRoutine('sunset-sunset+30m rest')[0].end.minutes, 30);
 });
 
+test('sunset offsets accept six hours and reject larger magnitudes on their source line', () => {
+  for (const [token, minutes] of [
+    ['sunset-6h', -360], ['sunset+6h', 360], ['sunset-360m', -360], ['sunset+360m', 360],
+  ]) assert.deepEqual(parseRoutine(`${token} outing`)[0].start, { base: 'sunset', minutes });
+  for (const token of ['sunset-20h..sunset-19h', 'sunset+10h', 'sunset-6h1m',
+    'sunset+361m', '12:00-sunset+6h1m', '12:00..sunset-361m']) {
+    for (const validate of [true, false]) {
+      assert.deepEqual(code(() => parseRoutine(`# note\n${token} invalid`, DEFAULT_PLACE, { validate })),
+        ['badTime', 2], token);
+    }
+  }
+});
+
 test('every parse error has its code and source line', () => {
   const cases = [
     ['# note\nhello', 'unreadable', 2],
@@ -193,6 +206,21 @@ test('schedule text round-trips to identical absolute item times', () => {
     assert.equal(schedule.anchor, day.anchor);
     assert.deepEqual(absoluteItems(parseSchedule(schedule.text), schedule.anchor),
       day.items.map(({ start, end, name }) => ({ start, end, name })));
+  }
+});
+
+test('default and six-hour sunset offsets round-trip in June and December', () => {
+  const offsetRoutine = `09:00-10:00 First
+sunset-6h-sunset Early
+sunset..sunset+6h Late`;
+  for (const text of [DEFAULT_ROUTINE, offsetRoutine]) {
+    const items = parseRoutine(text);
+    for (const date of ['2026-06-27', '2026-12-05']) {
+      const day = placeRoutine(items, date);
+      const schedule = routineSchedule(day);
+      assert.deepEqual(absoluteItems(parseSchedule(schedule.text), schedule.anchor),
+        day.items.map(({ start, end, name }) => ({ start, end, name })), `${date}: ${text}`);
+    }
   }
 });
 

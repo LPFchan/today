@@ -152,7 +152,9 @@ function duration(text, line, code, allowZero = false) {
 function time(token, line) {
   if (token.startsWith('sunset')) {
     if (token === 'sunset') return { base: 'sunset', minutes: 0 };
-    return { base: 'sunset', minutes: (token[6] === '-' ? -1 : 1) * duration(token.slice(7), line, 'badTime', true) };
+    const offset = duration(token.slice(7), line, 'badTime', true);
+    if (offset > 6 * 60) throw new RoutineError('badTime', line);
+    return { base: 'sunset', minutes: (token[6] === '-' ? -1 : 1) * offset };
   }
   const [hours, minutes] = token.split(':').map(Number);
   if (hours > 23 || minutes > 59) throw new RoutineError('badTime', line);
