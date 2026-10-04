@@ -342,12 +342,28 @@ test('window start and completion respect the minimum and expose keepout before,
   expectError(await status('done', meal.key), 409, 'not_due');
 });
 
+test('starting a window is blocked by an earlier unfinished lock and allowed after completion', async (t) => {
+  const { enable, status, call, at, DB } = setup(t, '12:00');
+  await enable();
+  at('12:30');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
+  expectError(await status('start', '12:30..14:00'), 409, 'locked');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+  assert.equal((await status('done', '12:00-12:20')).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  const started = await status('start', '12:30..14:00');
+  assert.equal(started.status, 200);
+  assert.equal(started.body.today.keepout.key, '12:30..14:00');
+  assert.equal(started.body.today.items.find((item) => item.key === '12:30..14:00').startedAt, instant('12:30'));
+  expectError(await status('start', '12:30..14:00'), 409, 'already');
+});
+
 test('unstarted windows lock at the deadline, and each overlapping lock uses its own minimum', async (t) => {
   const { enable, status, call, at } = setup(t, '12:00');
   await enable();
   at('14:00');
   assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
-  expectError(await status('start', '12:30..14:00'), 409, 'not_open');
+  expectError(await status('start', '12:30..14:00'), 409, 'locked');
   expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
   at('14:20');
   assert.equal((await status('done', '12:30..14:00')).status, 200);
@@ -359,7 +375,7 @@ test('unstarted windows lock at the deadline, and each overlapping lock uses its
 test('start and done reject the wrong day, unopened and unknown items, free time and sleep', async (t) => {
   const { enable, status, at, DB } = setup(t, '12:00');
   await enable();
-  expectError(await status('start', '12:30..14:00'), 409, 'not_open');
+  expectError(await status('start', '12:30..14:00'), 409, 'locked');
   expectError(await status('start', 'missing'), 404, 'not_found');
   expectError(await status('start', '12:00-12:20'), 409, 'not_open');
   expectError(await status('start', '12:30..14:00', '2026-10-04'), 409, 'not_open');
@@ -368,7 +384,7 @@ test('start and done reject the wrong day, unopened and unknown items, free time
   expectError(await status('done', '14:00-02:30'), 409, 'not_due');
   at('03:00', '2026-10-06');
   expectError(await status('done', '02:30-12:00'), 409, 'not_due');
-  expectError(await status('start', '14:00-02:30'), 409, 'not_open');
+  expectError(await status('start', '14:00-02:30'), 409, 'locked');
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
 });
 
@@ -384,9 +400,10 @@ test('status writes prune only this owner, keeping yesterday relative to the ins
   assert.deepEqual(DB.raw.prepare('SELECT day FROM routine_status WHERE sub = ? ORDER BY day').all('owner')
     .map((row) => row.day), ['2026-10-03', '2026-10-04']);
   at('12:30');
+  assert.equal((await status('done', '12:00-12:20')).status, 200);
   assert.equal((await status('start', '12:30..14:00')).status, 200);
   assert.deepEqual(DB.raw.prepare('SELECT day FROM routine_status WHERE sub = ? ORDER BY day').all('owner')
-    .map((row) => row.day), ['2026-10-04', '2026-10-05']);
+    .map((row) => row.day), ['2026-10-04', '2026-10-05', '2026-10-05']);
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status WHERE sub = ?').get('other').n, 1);
 });
 

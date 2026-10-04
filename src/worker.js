@@ -305,6 +305,8 @@ async function routineStatus(request, env, me, action) {
   });
   const status = routine.statuses[item.key];
   if (action === 'start') {
+    const lock = routine.today.keepout;
+    if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
     if (status?.startedAt != null || status?.doneAt != null) return json(409, { error: 'already' });
     if (item.kind !== 'window' || now < item.start || now >= item.end) {
       return json(409, { error: 'not_open' });
