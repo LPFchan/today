@@ -141,7 +141,7 @@ test('manual edits survive until the instance changes at its first start', async
 });
 
 test('editing an enabled routine mid-day immediately replaces the day plan', async (t) => {
-  const { enable, call, status, at } = setup(t);
+  const { enable, call, status, at } = setup(t, '12:00');
   await enable();
   await status('done', '12:00-12:20');
   at('13:00');
@@ -153,9 +153,10 @@ test('editing an enabled routine mid-day immediately replaces the day plan', asy
 });
 
 test('turning a routine back on replaces a same-day manual plan', async (t) => {
-  const { enable, call, status } = setup(t);
+  const { enable, call, status, at } = setup(t, '12:00');
   await enable();
   await status('done', '12:00-12:20');
+  at('12:30');
   const manual = { text: '13:00-14:00 Manual', anchor: instant('00:00') };
   await call('PUT', '/api/schedule', manual);
   assert.equal((await call('PUT', '/api/routine', { enabled: false })).status, 200);
@@ -208,8 +209,9 @@ test('keepout blocks changes and disabling, while enabling and identical saves r
 });
 
 test('window start and completion respect the minimum and expose keepout before, during and after', async (t) => {
-  const { enable, status, call, at } = setup(t);
+  const { enable, status, call, at } = setup(t, '12:00');
   await enable();
+  at('12:30');
   // Fixed proof items stay due after their slot ends.
   assert.equal((await status('done', '12:00-12:20')).status, 200);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
@@ -238,8 +240,9 @@ test('window start and completion respect the minimum and expose keepout before,
 });
 
 test('unstarted windows lock at the deadline, and each overlapping lock uses its own minimum', async (t) => {
-  const { enable, status, call, at } = setup(t, '14:00');
+  const { enable, status, call, at } = setup(t, '12:00');
   await enable();
+  at('14:00');
   assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
   expectError(await status('start', '12:30..14:00'), 409, 'not_open');
   expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
@@ -267,8 +270,10 @@ test('start and done reject the wrong day, unopened and unknown items, free time
 });
 
 test('status writes prune only this owner, keeping yesterday relative to the instance day', async (t) => {
-  const { enable, status, DB, at } = setup(t, '03:00');
-  await enable(); // Before noon: the current instance is October 4.
+  const { enable, status, DB, at } = setup(t);
+  at('12:00', '2026-10-04');
+  await enable();
+  at('03:00'); // Before noon: the current instance is October 4.
   const insert = DB.raw.prepare('INSERT INTO routine_status (sub, day, key, done_at) VALUES (?, ?, ?, ?)');
   for (const day of ['2026-10-01', '2026-10-02', '2026-10-03']) insert.run('owner', day, 'old', 1);
   insert.run('other', '2026-10-01', 'old', 1);
@@ -280,6 +285,96 @@ test('status writes prune only this owner, keeping yesterday relative to the ins
   assert.deepEqual(DB.raw.prepare('SELECT day FROM routine_status WHERE sub = ? ORDER BY day').all('owner')
     .map((row) => row.day), ['2026-10-04', '2026-10-05']);
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status WHERE sub = ?').get('other').n, 1);
+});
+
+test('enabling at 02:10 skips ended keepouts while ongoing and next items still lock', async (t) => {
+  const { enable, call, status, at, DB } = setup(t, '02:10');
+  const enabled = await enable(DEFAULT_ROUTINE);
+  assert.equal(enabled.status, 200);
+  assert.equal(enabled.body.today.day, '2026-10-04');
+  assert.equal(enabled.body.today.keepout.key, '02:00-02:30');
+  const earlier = enabled.body.today.items.filter((item) => item.end <= instant('02:10'));
+  assert.ok(earlier.length > 0);
+  assert.ok(earlier.every((item) => !item.keepout && !['locked', 'missed'].includes(item.phase)));
+  for (const key of ['12:30..14:00', 'sunset-1h..sunset']) {
+    assert.equal(earlier.find((item) => item.key === key).keepout, false);
+    expectError(await status('done', key, '2026-10-04'), 409, 'not_due');
+  }
+  const hygiene = enabled.body.today.items.find((item) => item.key === '02:00-02:30');
+  assert.equal(hygiene.keepout, true);
+  assert.equal(hygiene.phase, 'locked');
+  assert.equal((await status('done', hygiene.key, '2026-10-04')).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  assert.equal(DB.raw.prepare('SELECT enabled_at FROM routines').get().enabled_at, instant('02:10'));
+  at('02:30');
+  const current = (await call('GET', '/api/routine')).body.today;
+  assert.equal(current.items.find((item) => item.key === '02:30-12:00').phase, 'locked');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '02:30-12:00');
+  at('12:00');
+  assert.equal((await call('GET', '/api/routine')).body.today.items[0].phase, 'locked');
+});
+
+test('enabling before the day preserves overdue locks and minimum completion times', async (t) => {
+  const { enable, call, status, at } = setup(t, '11:59');
+  await enable();
+  at('12:00');
+  assert.equal((await call('GET', '/api/routine')).body.today.items[0].phase, 'locked');
+  at('14:00');
+  const current = (await call('GET', '/api/routine')).body.today;
+  assert.equal(current.items.find((item) => item.key === '12:30..14:00').phase, 'locked');
+  assert.equal(current.keepout.key, '12:00-12:20');
+  expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
+  assert.equal((await status('done', '12:00-12:20')).status, 200);
+  at('14:20');
+  assert.equal((await status('done', '12:30..14:00')).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+});
+
+test('opt-in time changes only on enabling, and off/on during an open window keeps it owed', async (t) => {
+  const { enable, call, status, at, DB } = setup(t);
+  await call('PUT', '/api/routine', { text: ROUTINE });
+  const enabledAt = () => DB.raw.prepare('SELECT enabled_at FROM routines').get().enabled_at;
+  assert.equal(enabledAt(), 0);
+  await call('PUT', '/api/routine', { enabled: true });
+  assert.equal(enabledAt(), instant('12:30'));
+  expectError(await status('done', '12:00-12:20'), 409, 'not_due');
+  at('13:00');
+  assert.equal((await enable(ROUTINE + '\n# note')).status, 200);
+  assert.equal(enabledAt(), instant('12:30'));
+  assert.equal((await call('PUT', '/api/routine', { enabled: false })).status, 200);
+  assert.equal(enabledAt(), instant('12:30'));
+  const reenabled = await call('PUT', '/api/routine', { enabled: true });
+  assert.equal(reenabled.status, 200);
+  assert.equal(enabledAt(), instant('13:00'));
+  const meal = reenabled.body.today.items.find((item) => item.key === '12:30..14:00');
+  assert.equal(meal.keepout, true);
+  assert.equal(meal.phase, 'open');
+  at('14:00');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, meal.key);
+  expectError(await status('done', meal.key), 409, 'too_soon');
+  at('14:20');
+  assert.equal((await status('done', meal.key)).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  at('12:30', '2026-10-06');
+  await status('done', '12:00-12:20', '2026-10-06');
+  assert.equal((await status('start', '12:30..14:00', '2026-10-06')).body.today.keepout.key, '12:30..14:00');
+});
+
+test('items ending exactly at opt-in are skipped', async (t) => {
+  const { enable, call, status } = setup(t, '12:20');
+  const enabled = await enable();
+  assert.equal(enabled.body.today.items[0].keepout, false);
+  assert.equal(enabled.body.today.items[0].phase, 'past');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  expectError(await status('done', '12:00-12:20'), 409, 'not_due');
+});
+
+test('existing enabled rows retain keepout behavior with the migration default', async (t) => {
+  const { call, DB } = setup(t);
+  DB.raw.prepare('INSERT INTO routines (sub, text, enabled, updated_at) VALUES (?, ?, 1, ?)')
+    .run('owner', ROUTINE, Date.now());
+  assert.equal(DB.raw.prepare('SELECT enabled_at FROM routines').get().enabled_at, 0);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
 });
 
 test('RoutineError on reread leaves the routine unavailable and preserves the manual plan', async (t) => {

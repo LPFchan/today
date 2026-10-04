@@ -182,6 +182,9 @@ async function currentRoutine(env, me, now = Date.now()) {
     if (error instanceof RoutineError) return result;
     throw error;
   }
+  // Opting in skips ended slots; open windows and ongoing items stay owed.
+  day.items = day.items.map((item) => item.end <= row.enabled_at
+    ? { ...item, keepout: false } : item);
   if (row.materialized_day !== day.day) {
     const schedule = routineSchedule(day);
     await upsertPerson(env, me, {
@@ -249,11 +252,12 @@ async function saveRoutine(request, env, me) {
     }
   }
   await env.DB.prepare(
-    'INSERT INTO routines (sub, text, enabled, updated_at) VALUES (?1, ?2, ?3, ?4) ' +
+    'INSERT INTO routines (sub, text, enabled, updated_at, enabled_at) VALUES (?1, ?2, ?3, ?4, ?5) ' +
       'ON CONFLICT (sub) DO UPDATE SET text = ?2, enabled = ?3, updated_at = ?4, ' +
+      'enabled_at = CASE WHEN enabled = 0 AND ?3 = 1 THEN ?4 ELSE enabled_at END, ' +
       'materialized_day = CASE WHEN text <> ?2 OR (enabled = 0 AND ?3 = 1) ' +
         'THEN NULL ELSE materialized_day END',
-  ).bind(me.sub, text, Number(enabled), now).run();
+  ).bind(me.sub, text, Number(enabled), now, enabled ? now : 0).run();
   return json(200, await routineProfile(env, me));
 }
 
