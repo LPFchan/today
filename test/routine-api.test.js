@@ -171,6 +171,64 @@ test('a visibility write paused across rollover cannot restore a stale schedule'
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
 });
 
+test('concurrent rollover reads claim the day once and preserve a manual save between them', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  const prepare = DB.prepare.bind(DB);
+  let pause;
+  let resume;
+  let holdSnapshot = true;
+  let prunes = 0;
+  const claims = [];
+  const paused = new Promise((resolve) => { pause = resolve; });
+  const resumed = new Promise((resolve) => { resume = resolve; });
+  t.mock.method(DB, 'prepare', (sql) => {
+    const statement = prepare(sql);
+    return {
+      ...statement,
+      bind: (...values) => {
+        const bound = statement.bind(...values);
+        return {
+          ...bound,
+          first: async () => {
+            const snapshot = await bound.first();
+            if (sql === 'SELECT * FROM routines WHERE sub = ?1' && holdSnapshot) {
+              holdSnapshot = false;
+              assert.equal(snapshot.materialized_day, '2026-10-05');
+              pause();
+              await resumed;
+            }
+            return snapshot;
+          },
+          run: async () => {
+            const written = await bound.run();
+            if (sql.includes('materialized_day IS NOT')) claims.push(written.meta.changes);
+            if (sql.startsWith('DELETE FROM routine_status') && sql.includes('day <')) prunes++;
+            return written;
+          },
+        };
+      },
+    };
+  });
+  at('12:00', '2026-10-06');
+  const delayed = call('GET', '/api/me');
+  await paused;
+  const manual = { text: '13:00-14:00 Manual', anchor: instant('00:00', '2026-10-06') };
+  try {
+    assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:00', '2026-10-06'));
+    assert.deepEqual((await call('PUT', '/api/schedule', manual)).body.schedule, manual);
+  } finally {
+    resume();
+  }
+  const finished = await delayed;
+  assert.equal(finished.status, 200);
+  assert.deepEqual(finished.body.schedule, manual);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, manual);
+  assert.deepEqual(claims, [1, 0]);
+  assert.equal(prunes, 1);
+  assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+});
+
 test('manual edits survive until the instance changes at its first start', async (t) => {
   const { enable, call, at } = setup(t);
   await enable();

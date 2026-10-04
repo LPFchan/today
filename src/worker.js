@@ -208,16 +208,19 @@ async function currentRoutine(env, me, now = Date.now()) {
   day.items = day.items.map((item) => item.end <= row.enabled_at
     ? { ...item, keepout: false } : item);
   if (row.materialized_day !== day.day) {
-    const schedule = routineSchedule(day);
-    await upsertPerson(env, me, {
-      schedule: serializeSchedule(parseSchedule(schedule.text)), anchor: schedule.anchor,
-    });
-    const yesterday = new Date(Date.parse(`${day.day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
-    await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
-      .bind(me.sub, yesterday).run();
-    await env.DB.prepare('UPDATE routines SET materialized_day = ?2 WHERE sub = ?1')
-      .bind(me.sub, day.day).run();
-    result.materialized = true;
+    const claim = await env.DB.prepare(
+      'UPDATE routines SET materialized_day = ?2 WHERE sub = ?1 AND materialized_day IS NOT ?2',
+    ).bind(me.sub, day.day).run();
+    if (claim.meta.changes) {
+      const schedule = routineSchedule(day);
+      await upsertPerson(env, me, {
+        schedule: serializeSchedule(parseSchedule(schedule.text)), anchor: schedule.anchor,
+      });
+      const yesterday = new Date(Date.parse(`${day.day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
+      await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
+        .bind(me.sub, yesterday).run();
+      result.materialized = true;
+    }
   }
   const { results } = await env.DB.prepare(
     'SELECT key, started_at, done_at FROM routine_status WHERE sub = ?1 AND day = ?2',
