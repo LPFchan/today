@@ -66,21 +66,7 @@ function keepoutActions(container, state) {
 function render() {
   const today = routine.today;
   const keepout = today?.keepout;
-  $('routineNow').hidden = false;
   $('routineToday').hidden = false;
-  $('routineNow').classList.toggle('is-keepout', Boolean(keepout));
-  $('routineNowTitle').textContent = t(keepout ? 'routineKeepoutActive' : 'now');
-  $('routineKeepoutName').textContent = keepout ? keepout.name : t(routine.enabled ? 'routineNoKeepout' : 'routineOffTitle');
-  $('routineNeeds').textContent = keepout
-    ? keepout.needs.length
-      ? t('routineUnlocks', { needs: keepout.needs.map((need) => t(`routineNeed_${need}`)).join(', ') })
-      : keepout.until !== null
-        ? t('routineUnlockAt', { time: clock(keepout.until) })
-        : t('routineWaitingUnlock')
-    : t(routine.enabled ? 'routineNoKeepoutHint' : 'routineOff');
-  const actions = $('routineNowActions');
-  actions.replaceChildren();
-  if (keepout) keepoutActions(actions, keepout);
 
   $('routineDay').textContent = today ? t('routineDayZone', { day: today.day, tz: routine.tz }) : '';
   $('routineItemsEmpty').hidden = Boolean(today?.items.length);
@@ -88,7 +74,8 @@ function render() {
   const list = $('routineItems');
   list.replaceChildren();
   for (const item of today?.items ?? []) {
-    const row = node('li', `routine-item is-${item.phase}`);
+    const isKeepoutNow = keepout?.key === item.key;
+    const row = node('li', `routine-item is-${item.phase}${isKeepoutNow ? ' is-keepout-now' : ''}`);
     const times = node('div', 'routine-item-time');
     times.append(node('span', '', `${clock(item.start)}–${clock(item.end)}`));
     if (new Date(item.start).toDateString() !== new Date(item.end).toDateString()) {
@@ -97,12 +84,20 @@ function render() {
     if (item.kind === 'window') times.append(node('span', 'routine-muted', t('routineWindow')));
     const details = node('div', 'routine-item-details');
     details.append(node('span', 'routine-item-name', item.name));
+    if (isKeepoutNow) {
+      const unlocks = keepout.needs.length
+        ? t('routineUnlocks', { needs: keepout.needs.map((need) => t(`routineNeed_${need}`)).join(', ') })
+        : keepout.until !== null
+          ? t('routineUnlockAt', { time: clock(keepout.until) })
+          : t('routineWaitingUnlock');
+      details.append(node('p', 'routine-item-unlocks routine-muted', unlocks));
+    }
     const status = node('div', 'routine-item-status');
-    status.append(node('span', '', t(`routinePhase_${item.phase}`)));
-    if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
+    status.append(node('span', '', t(isKeepoutNow ? 'routineKeepoutActive' : `routinePhase_${item.phase}`)));
+    if (item.keepout && !isKeepoutNow) status.append(node('span', 'routine-tag', t('routineKeepout')));
     details.append(status);
     const buttons = node('div', 'routine-actions');
-    if (keepout?.key === item.key) {
+    if (isKeepoutNow) {
       keepoutActions(buttons, keepout);
     } else if (item.phase === 'open' && item.doneAt === null && item.kind === 'window' && item.startedAt === null) {
       buttons.append(actionButton('start', item, true));

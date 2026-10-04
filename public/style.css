@@ -1437,24 +1437,6 @@ textarea[aria-invalid='true'] {
   color: var(--danger);
 }
 
-.routine-page .routine-now.is-keepout {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.routine-page .routine-now h3 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -0.02em;
-  overflow-wrap: anywhere;
-}
-
-.routine-page .routine-now .section-label {
-  color: var(--text-muted);
-  font-size: 11px;
-}
-
 .routine-page .routine-items {
   margin: 0;
   padding: 0;
@@ -1468,6 +1450,24 @@ textarea[aria-invalid='true'] {
   align-items: start;
   padding: 16px 0;
   border-top: 1px solid var(--hair);
+}
+
+.routine-page .routine-item.is-keepout-now {
+  margin-block: 8px;
+  padding: 16px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+
+.routine-page .routine-item.is-keepout-now .routine-item-status {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.routine-page .routine-item-unlocks {
+  margin-top: 6px;
+  overflow-wrap: anywhere;
 }
 
 .routine-page .routine-item-time {
