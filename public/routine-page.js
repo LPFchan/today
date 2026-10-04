@@ -171,7 +171,7 @@ function render() {
     const buttons = node('div', 'routine-actions');
     if (isKeepoutNow) {
       keepoutActions(buttons, keepout);
-    } else if (!keepout && item.phase === 'open' && item.doneAt === null && item.kind === 'window' && item.startedAt === null) {
+    } else if (!keepout && item.keepout && item.phase === 'open' && item.doneAt === null && item.kind === 'window' && item.startedAt === null) {
       buttons.append(actionButton('start', item, true));
     }
     row.append(times, details, buttons);

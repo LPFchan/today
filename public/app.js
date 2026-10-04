@@ -66,6 +66,7 @@ const state = {
   board: null, // { people }
   profileAt: 0, // when /api/me was last requested
   profileSeq: 0, // bumped by every applied profile
+  profileReads: 0, // bumped by every started /api/me read
   view: location.pathname.startsWith('/everyone') ? 'everyone' : 'mine',
   completed: null,
   pendingStart: null,
@@ -161,9 +162,10 @@ function applyProfile(profile) {
 async function loadProfile() {
   state.profileAt = Date.now();
   const seq = state.profileSeq;
+  const read = ++state.profileReads;
   const profile = await request('GET', '/api/me');
-  // A save that landed while this read was in flight is newer; keep it.
-  if (state.profileSeq === seq) applyProfile(profile);
+  // Only the latest read applies, and not if a save landed meanwhile.
+  if (read === state.profileReads && state.profileSeq === seq) applyProfile(profile);
 }
 
 async function loadBoard() {
