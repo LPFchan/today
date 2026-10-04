@@ -73,7 +73,7 @@ test('routine routes require gateway identity and reject malformed writes', asyn
 test('opted-out users retain their profile, board and watch; routine reads write nothing', async (t) => {
   const { call, DB } = setup(t);
   assert.deepEqual((await call('GET', '/api/routine')).body, {
-    enabled: false, text: DEFAULT_ROUTINE, tz: 'Asia/Seoul', today: null,
+    enabled: false, text: DEFAULT_ROUTINE, pendingFrom: null, tz: 'Asia/Seoul', today: null,
   });
   assert.deepEqual((await call('GET', '/api/keepout')).body, { now: Date.now(), keepout: null });
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
@@ -140,42 +140,142 @@ test('manual edits survive until the instance changes at its first start', async
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:00', '2026-10-06'));
 });
 
-test('editing an enabled routine mid-day immediately replaces the day plan', async (t) => {
-  const { enable, call, status, at } = setup(t, '12:00');
+test('enabled edits wait for the next instance and leave the current plan and keepout unchanged', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
   await enable();
-  await status('done', '12:00-12:20');
   at('13:00');
-  const revised = ROUTINE.replace('14:00-02:30 Free', '14:00-02:30 New plan');
+  const before = (await call('GET', '/api/routine')).body.today;
+  const revised = ROUTINE.replace('Wake ! until wake, done', 'New wake')
+    .replace('14:00-02:30 Free', '14:00-02:30 New plan');
   const saved = await call('PUT', '/api/routine', { text: revised });
   assert.equal(saved.status, 200);
-  assert.equal(saved.body.today.items.find((item) => item.key === '14:00-02:30').name, 'New plan');
-  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '13:00'));
+  assert.equal(saved.body.text, revised);
+  assert.equal(saved.body.pendingFrom, '2026-10-06');
+  assert.deepEqual(saved.body.today, before);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '13:00'));
+  assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, ROUTINE);
+  at('11:59', '2026-10-06');
+  assert.equal((await call('GET', '/api/routine')).body.pendingFrom, '2026-10-06');
+  at('12:00', '2026-10-06');
+  const next = (await call('GET', '/api/routine')).body;
+  assert.equal(next.text, revised);
+  assert.equal(next.pendingFrom, null);
+  assert.equal(next.today.day, '2026-10-06');
+  assert.equal(next.today.items[0].name, 'New wake');
+  assert.equal(next.today.keepout, null);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '12:00', '2026-10-06'));
+  assert.deepEqual({ ...DB.raw.prepare('SELECT text, pending_text, pending_from FROM routines').get() }, {
+    text: revised, pending_text: null, pending_from: null,
+  });
 });
 
-test('turning a routine back on replaces a same-day manual plan', async (t) => {
-  const { enable, call, status, at } = setup(t, '12:00');
+test('enabling after an operator switch-off replaces a same-day manual plan', async (t) => {
+  const { enable, call, status, at, DB } = setup(t, '12:00');
   await enable();
   await status('done', '12:00-12:20');
   at('12:30');
   const manual = { text: '13:00-14:00 Manual', anchor: instant('00:00') };
   await call('PUT', '/api/schedule', manual);
-  assert.equal((await call('PUT', '/api/routine', { enabled: false })).status, 200);
+  expectError(await call('PUT', '/api/routine', { enabled: false }), 409, 'ask_hermes');
+  DB.raw.prepare('UPDATE routines SET enabled = 0 WHERE sub = ?').run('owner');
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, manual);
   assert.equal((await call('PUT', '/api/routine', { enabled: true })).status, 200);
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:30'));
 });
 
+test('text edits while off apply immediately without writing a day plan', async (t) => {
+  const { call, DB } = setup(t);
+  const revised = ROUTINE.replace('Free', 'Edited free time');
+  for (const text of [ROUTINE, revised]) {
+    const saved = await call('PUT', '/api/routine', { text });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.body, {
+      enabled: false, text, pendingFrom: null, tz: 'Asia/Seoul', today: null,
+    });
+    const row = DB.raw.prepare('SELECT * FROM routines').get();
+    assert.equal(row.text, text);
+    assert.equal(row.pending_text, null);
+    assert.equal(row.pending_from, null);
+  }
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
+  assert.equal((await call('PUT', '/api/routine', { enabled: true })).status, 200);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '12:30'));
+});
+
+test('a second edit replaces pending text; enabling and invalid edits leave it alone', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  const first = ROUTINE.replace('Free', 'First edit');
+  const second = ROUTINE.replace('Free', 'Second edit');
+  assert.equal((await call('PUT', '/api/routine', { text: first })).status, 200);
+  at('13:00');
+  const saved = await call('PUT', '/api/routine', { text: second });
+  assert.equal(saved.body.text, second);
+  assert.equal(saved.body.pendingFrom, '2026-10-06');
+  assert.equal((await call('PUT', '/api/routine', { enabled: true })).body.text, second);
+  assert.deepEqual(await call('PUT', '/api/routine', { text: 'not a routine' }), {
+    status: 422, body: { error: 'unreadable', line: 1 },
+  });
+  assert.equal((await call('GET', '/api/routine')).body.text, second);
+  assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, ROUTINE);
+  const manual = { text: '13:00-14:00 Manual', anchor: instant('00:00') };
+  await call('PUT', '/api/schedule', manual);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, manual);
+  at('12:00', '2026-10-07');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(second, '12:00', '2026-10-07'));
+  assert.equal((await call('GET', '/api/routine')).body.pendingFrom, null);
+});
+
+test('overnight edits target the next instance date, not the next calendar date', async (t) => {
+  const { enable, call, at } = setup(t, '02:10');
+  await enable();
+  const revised = ROUTINE.replace('Free', 'Next instance');
+  const saved = await call('PUT', '/api/routine', { text: revised });
+  assert.equal(saved.body.today.day, '2026-10-04');
+  assert.equal(saved.body.pendingFrom, '2026-10-05');
+  at('12:00');
+  const next = (await call('GET', '/api/routine')).body;
+  assert.equal(next.pendingFrom, null);
+  assert.equal(next.today.items.find((item) => item.key === '14:00-02:30').name, 'Next instance');
+});
+
+test('moving the first start later keeps the promoted instance on its next-day date', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  const original = '12:00-12:30 First ! until done\n14:00-15:00 Second ! until done';
+  const revised = original.replace('12:00-12:30', '13:00-13:30');
+  await enable(original);
+  assert.equal((await call('PUT', '/api/routine', { text: revised })).body.pendingFrom, '2026-10-06');
+  at('12:00', '2026-10-06');
+  for (let read = 0; read < 2; read++) {
+    const next = (await call('GET', '/api/routine')).body;
+    assert.equal(next.today.day, '2026-10-06');
+    assert.equal(next.pendingFrom, null);
+    assert.equal(next.today.items[0].start, instant('13:00', '2026-10-06'));
+    assert.equal(next.today.items[0].phase, 'upcoming');
+  }
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, {
+    text: revised.replaceAll(' ! until done', ''), anchor: instant('00:00', '2026-10-06'),
+  });
+  at('13:00', '2026-10-06');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '13:00-13:30');
+});
+
 for (const route of ['/api/me', '/api/watch', '/api/routine', '/api/keepout', '/api/board']) {
-  test(`${route} lazily materializes a new instance`, async (t) => {
+  test(`${route} promotes pending text and materializes a new instance`, async (t) => {
     const { enable, call, at, DB } = setup(t);
     await enable();
     await call('PUT', '/api/visibility', { visibility: 'public' });
+    const revised = ROUTINE.replace('Free', 'Pending plan');
+    assert.equal((await call('PUT', '/api/routine', { text: revised })).body.pendingFrom, '2026-10-06');
     at('12:00', '2026-10-06');
     await call('GET', route, undefined, route === '/api/board' ? 'viewer' : 'owner');
     const person = DB.raw.prepare('SELECT schedule, anchor FROM people WHERE sub = ?').get('owner');
-    const expected = expectedSchedule(ROUTINE, '12:00', '2026-10-06');
+    const expected = expectedSchedule(revised, '12:00', '2026-10-06');
     assert.deepEqual({ text: person.schedule, anchor: person.anchor }, expected);
     assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+    assert.deepEqual({ ...DB.raw.prepare('SELECT text, pending_text, pending_from FROM routines').get() }, {
+      text: revised, pending_text: null, pending_from: null,
+    });
   });
 }
 
@@ -193,18 +293,21 @@ test('saving validates all seasons and includes the failing source line', async 
   assert.equal(defaultEnabled.body.text, DEFAULT_ROUTINE);
 });
 
-test('keepout blocks changes and disabling, while enabling and identical saves remain allowed', async (t) => {
+test('switching off requires Hermes both during a lock and outside it; edits and enabling stay allowed', async (t) => {
   const { enable, call, status, at } = setup(t, '12:00');
   await call('PUT', '/api/routine', { text: ROUTINE });
   assert.equal((await call('PUT', '/api/routine', { enabled: true })).status, 200);
-  expectError(await call('PUT', '/api/routine', { text: ROUTINE + '\n# edit' }), 409, 'keepout');
-  expectError(await call('PUT', '/api/routine', { enabled: false }), 409, 'keepout');
+  assert.equal((await call('PUT', '/api/routine', { text: ROUTINE + '\n# edit' })).status, 200);
+  expectError(await call('PUT', '/api/routine', { enabled: false }), 409, 'ask_hermes');
   assert.equal((await call('PUT', '/api/routine', { enabled: true })).status, 200);
   assert.equal((await enable()).status, 200);
   await status('done', '12:00-12:20');
   at('12:30');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
   assert.equal((await call('PUT', '/api/routine', { text: ROUTINE + '\n# edit' })).status, 200);
-  assert.equal((await call('PUT', '/api/routine', { enabled: false })).body.today, null);
+  expectError(await call('PUT', '/api/routine', { enabled: false }), 409, 'ask_hermes');
+  expectError(await call('PUT', '/api/routine', { text: '12:00 Edited', enabled: false }), 409, 'ask_hermes');
+  assert.equal((await call('GET', '/api/routine')).body.enabled, true);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
 });
 
@@ -330,7 +433,7 @@ test('enabling before the day preserves overdue locks and minimum completion tim
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
 });
 
-test('opt-in time changes only on enabling, and off/on during an open window keeps it owed', async (t) => {
+test('opt-in time changes only on enabling, and an operator off/on during an open window keeps it owed', async (t) => {
   const { enable, call, status, at, DB } = setup(t);
   await call('PUT', '/api/routine', { text: ROUTINE });
   const enabledAt = () => DB.raw.prepare('SELECT enabled_at FROM routines').get().enabled_at;
@@ -341,7 +444,8 @@ test('opt-in time changes only on enabling, and off/on during an open window kee
   at('13:00');
   assert.equal((await enable(ROUTINE + '\n# note')).status, 200);
   assert.equal(enabledAt(), instant('12:30'));
-  assert.equal((await call('PUT', '/api/routine', { enabled: false })).status, 200);
+  expectError(await call('PUT', '/api/routine', { enabled: false }), 409, 'ask_hermes');
+  DB.raw.prepare('UPDATE routines SET enabled = 0 WHERE sub = ?').run('owner');
   assert.equal(enabledAt(), instant('12:30'));
   const reenabled = await call('PUT', '/api/routine', { enabled: true });
   assert.equal(reenabled.status, 200);

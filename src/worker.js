@@ -18,7 +18,7 @@ import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
   DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
-  parseRoutine, routineDay, routineSchedule,
+  parseRoutine, placeRoutine, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -169,19 +169,36 @@ async function savedRoutine(env, sub) {
   return env.DB.prepare('SELECT * FROM routines WHERE sub = ?1').bind(sub).first();
 }
 
+function routineInstance(row, now, earliestDay = row.materialized_day) {
+  const place = { tz: row.tz, lat: row.lat, lon: row.lon };
+  const items = parseRoutine(row.text, place, { validate: false });
+  const day = routineDay(items, now, place);
+  // Moving the first start later must not bring yesterday's instance back.
+  return earliestDay && day.day < earliestDay ? placeRoutine(items, earliestDay, place) : day;
+}
+
 /** Place the current instance; unavailable routines leave the day plan alone. */
 async function currentRoutine(env, me, now = Date.now()) {
-  const row = await savedRoutine(env, me.sub);
+  let row = await savedRoutine(env, me.sub);
   const result = { row, today: null, materialized: false };
-  if (!row?.enabled) return result;
+  if (!row || (!row.enabled && !row.pending_text)) return result;
   let day;
   try {
-    const place = { tz: row.tz, lat: row.lat, lon: row.lon };
-    day = routineDay(parseRoutine(row.text, place, { validate: false }), now, place);
+    day = routineInstance(row, now);
+    if (row.pending_text !== null && row.pending_from !== null && day.day >= row.pending_from) {
+      await env.DB.prepare(
+        'UPDATE routines SET text = pending_text, pending_text = NULL, pending_from = NULL, ' +
+          'materialized_day = NULL WHERE sub = ?1 AND pending_from <= ?2',
+      ).bind(me.sub, day.day).run();
+      row = await savedRoutine(env, me.sub);
+      result.row = row;
+      day = routineInstance(row, now, day.day);
+    }
   } catch (error) {
     if (error instanceof RoutineError) return result;
     throw error;
   }
+  if (!row.enabled) return result;
   // Opting in skips ended slots; open windows and ongoing items stay owed.
   day.items = day.items.map((item) => item.end <= row.enabled_at
     ? { ...item, keepout: false } : item);
@@ -217,7 +234,8 @@ async function currentRoutine(env, me, now = Date.now()) {
 function routineValue(routine) {
   return {
     enabled: Boolean(routine.row?.enabled),
-    text: routine.row?.text ?? DEFAULT_ROUTINE,
+    text: routine.row?.pending_text ?? routine.row?.text ?? DEFAULT_ROUTINE,
+    pendingFrom: routine.row?.pending_from ?? null,
     tz: routine.row?.tz ?? DEFAULT_PLACE.tz,
     today: routine.today,
   };
@@ -237,10 +255,10 @@ async function saveRoutine(request, env, me) {
   }
   const now = Date.now();
   const current = await currentRoutine(env, me, now);
-  const text = body.text ?? current.row?.text ?? DEFAULT_ROUTINE;
+  const text = body.text ?? current.row?.pending_text ?? current.row?.text ?? DEFAULT_ROUTINE;
   const enabled = body.enabled ?? Boolean(current.row?.enabled);
-  if (current.today?.keepout && (text !== current.row.text || !enabled)) {
-    return json(409, { error: 'keepout' });
+  if (current.row?.enabled && body.enabled === false) {
+    return json(409, { error: 'ask_hermes' });
   }
   if (Object.hasOwn(body, 'text')) {
     const place = current.row ?? DEFAULT_PLACE;
@@ -251,11 +269,22 @@ async function saveRoutine(request, env, me) {
       throw error;
     }
   }
+  if (current.row?.enabled) {
+    if (Object.hasOwn(body, 'text')) {
+      const day = current.day?.day ?? zonedDate(now, current.row.tz);
+      const pendingFrom = new Date(Date.parse(`${day}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+      await env.DB.prepare(
+        'UPDATE routines SET pending_text = ?2, pending_from = ?3, updated_at = ?4 WHERE sub = ?1',
+      ).bind(me.sub, text, pendingFrom, now).run();
+    }
+    return json(200, await routineProfile(env, me));
+  }
   await env.DB.prepare(
     'INSERT INTO routines (sub, text, enabled, updated_at, enabled_at) VALUES (?1, ?2, ?3, ?4, ?5) ' +
       'ON CONFLICT (sub) DO UPDATE SET text = ?2, enabled = ?3, updated_at = ?4, ' +
+      'pending_text = NULL, pending_from = NULL, ' +
       'enabled_at = CASE WHEN enabled = 0 AND ?3 = 1 THEN ?4 ELSE enabled_at END, ' +
-      'materialized_day = CASE WHEN text <> ?2 OR (enabled = 0 AND ?3 = 1) ' +
+      'materialized_day = CASE WHEN enabled = 0 AND ?3 = 1 ' +
         'THEN NULL ELSE materialized_day END',
   ).bind(me.sub, text, Number(enabled), now, enabled ? now : 0).run();
   return json(200, await routineProfile(env, me));
