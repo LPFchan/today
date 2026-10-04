@@ -1365,6 +1365,12 @@ textarea[aria-invalid='true'] {
   text-transform: none;
 }
 
+.routine-page .routine-toggle-group {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+}
+
 .routine-page .routine-toggle {
   position: relative;
   display: inline-flex;

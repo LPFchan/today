@@ -20,7 +20,8 @@ function dirty() {
 
 function updateControls() {
   enabled.checked = routine?.enabled ?? false;
-  enabled.disabled = busy || !routine || signedOut;
+  enabled.disabled = busy || !routine || signedOut || routine.enabled;
+  $('routineDisableHint').hidden = !routine?.enabled;
   editor.disabled = !routine || signedOut;
   save.disabled = busy || !routine || signedOut || !dirty();
   retry.disabled = busy;
@@ -67,6 +68,8 @@ function render() {
   const today = routine.today;
   const keepout = today?.keepout;
   $('routineToday').hidden = false;
+  $('routinePending').hidden = !routine.pendingFrom;
+  $('routinePending').textContent = routine.pendingFrom ? t('routinePending', { date: routine.pendingFrom }) : '';
 
   $('routineDay').textContent = today ? t('routineDayZone', { day: today.day, tz: routine.tz }) : '';
   $('routineItemsEmpty').hidden = Boolean(today?.items.length);
@@ -211,8 +214,9 @@ async function mutate(method, path, body, inEditor = false) {
   updateControls();
   try {
     accept(await request(method, path, body), body.text);
-    message.textContent = t(body.text !== undefined ? 'routineSaved' : method === 'PUT'
-      ? routine.enabled ? 'routineTurnedOn' : 'routineTurnedOff' : 'routineUpdated');
+    message.textContent = body.text !== undefined
+      ? routine.pendingFrom ? t('routinePending', { date: routine.pendingFrom }) : t('routineSaved')
+      : t(method === 'PUT' ? 'routineTurnedOn' : 'routineUpdated');
     retry.hidden = true;
   } catch (error) {
     reportError(error, inEditor);
@@ -226,7 +230,10 @@ async function mutate(method, path, body, inEditor = false) {
   }
 }
 
-enabled.addEventListener('change', () => mutate('PUT', '/api/routine', { enabled: enabled.checked }));
+enabled.addEventListener('change', () => {
+  if (!routine?.enabled && enabled.checked) mutate('PUT', '/api/routine', { enabled: true });
+  else updateControls();
+});
 $('routineForm').addEventListener('submit', (event) => {
   event.preventDefault();
   if (dirty()) mutate('PUT', '/api/routine', { text: editor.value }, true);

@@ -28,11 +28,14 @@
       <section class="routine-section" aria-labelledby="routineTitle">
         <div class="routine-heading">
           <h1 id="routineTitle" data-t="routineTitle">auto-routine</h1>
-          <label class="routine-toggle">
-            <input id="routineEnabled" type="checkbox" role="switch" aria-describedby="routineExplanation" disabled />
-            <span class="routine-switch-track" aria-hidden="true"></span>
-            <span class="sr-only" data-t="routineEnabled">auto-routine</span>
-          </label>
+          <div class="routine-toggle-group">
+            <label class="routine-toggle">
+              <input id="routineEnabled" type="checkbox" role="switch" aria-describedby="routineExplanation routineDisableHint" disabled />
+              <span class="routine-switch-track" aria-hidden="true"></span>
+              <span class="sr-only" data-t="routineEnabled">auto-routine</span>
+            </label>
+            <p id="routineDisableHint" class="field-hint" data-t="routineDisableHint" hidden>To turn it off, ask Hermes.</p>
+          </div>
         </div>
         <p id="routineExplanation" class="routine-muted" data-t="routineExplanation">auto-routine repeats each day. Keepout items lock your devices and coding work until they’re finished.</p>
         <p id="routineMessage" class="routine-message" role="status" data-t="routineLoading">Loading your auto-routine…</p>
@@ -52,8 +55,9 @@
         <h2 id="routineEditorTitle" data-t="routineEditorTitle">Your repeating plan</h2>
         <form id="routineForm">
           <label for="routineText" class="sr-only" data-t="routineEditorLabel">auto-routine text</label>
-          <textarea id="routineText" spellcheck="false" aria-describedby="routineEditorHint routineError" disabled></textarea>
-          <p id="routineEditorHint" class="field-hint" data-t="routineEditorHint">One item per line. Changes apply to your repeating auto-routine.</p>
+          <textarea id="routineText" spellcheck="false" aria-describedby="routineEditorHint routinePending routineError" disabled></textarea>
+          <p id="routineEditorHint" class="field-hint" data-t="routineEditorHint">One item per line. While auto-routine is on, edits apply from the next day.</p>
+          <p id="routinePending" class="field-hint" hidden></p>
           <p id="routineError" class="field-error" role="alert" hidden></p>
           <div class="routine-actions">
             <button id="routineSave" class="btn primary" type="submit" data-t="save" disabled>Save</button>
