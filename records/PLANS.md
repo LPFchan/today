@@ -63,13 +63,13 @@ the board, the watch or the Mac app.
   - Scope: full-screen overlay over every display while keepout is due,
     showing the item and what unlocks it, with a "done" button for
     honor-system items and a "starting now" button for window items.
-    Until phases 4 and 5 land, items whose proof isn't built yet (wake-up,
-    meals, outing) complete with the same "done" button, so no lock can
-    become impossible to lift.
+    Until phase 6 lands, wake-up, meals and the outing can also complete
+    with the same "done" button, so no lock can become impossible to lift
+    before both proofs and bypasses exist.
   - Related ids: DEC-20261005-001
 - Phase 3 — agent keepout:
   - Why now: closes the "code over SSH from another machine" gap.
-  - Dependencies: phase 1; operator approval of the global agent-instructions edit.
+  - Dependencies: phases 1–2 (the overlay's "done" button is how a keepout item ends); operator approval of the global agent-instructions edit.
   - Scope: one `today-keepout` check in setup; Claude Code `UserPromptSubmit`,
     Codex `hooks.json` `UserPromptSubmit`, Gemini `BeforeAgent`, OpenCode
     tool-call blocking, a zsh launch wrapper for harnesses without hooks.
