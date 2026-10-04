@@ -353,6 +353,38 @@ test('enabled edits wait for the next instance and leave the current plan and ke
   });
 });
 
+test('an 11:00 edit moving the first start from 12:00 to 10:00 cannot erase the overnight lock', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
+  const original = '12:00-13:00 First\n03:00-12:00 Sleep !';
+  const revised = '10:00-11:00 New day';
+  await enable(original);
+  at('11:00', '2026-10-06');
+  const before = (await call('GET', '/api/routine')).body.today;
+  assert.equal(before.day, '2026-10-05');
+  assert.equal(before.keepout.key, '03:00-12:00');
+  const saved = await call('PUT', '/api/routine', { text: revised });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.text, revised);
+  assert.equal(saved.body.pendingFrom, '2026-10-07');
+  assert.deepEqual(saved.body.today, before);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '03:00-12:00');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(original, '11:00', '2026-10-06'));
+  assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, original);
+  at('12:00', '2026-10-06');
+  const stillPending = (await call('GET', '/api/routine')).body;
+  assert.equal(stillPending.pendingFrom, '2026-10-07');
+  assert.equal(stillPending.today.day, '2026-10-06');
+  assert.equal(stillPending.today.items[0].name, 'First');
+  at('09:59', '2026-10-07');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '03:00-12:00');
+  at('10:00', '2026-10-07');
+  const next = (await call('GET', '/api/routine')).body;
+  assert.equal(next.pendingFrom, null);
+  assert.equal(next.today.day, '2026-10-07');
+  assert.equal(next.today.items[0].name, 'New day');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '10:00', '2026-10-07'));
+});
+
 test('enabling after an operator switch-off replaces a same-day manual plan', async (t) => {
   const { enable, call, status, at, DB } = setup(t, '12:00');
   await enable();

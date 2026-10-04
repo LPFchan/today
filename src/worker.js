@@ -278,10 +278,12 @@ async function saveRoutine(request, env, me) {
   if (current.row?.enabled && body.enabled === false) {
     return json(409, { error: 'ask_hermes' });
   }
+  let revisedDay;
   if (Object.hasOwn(body, 'text')) {
     const place = current.row ?? DEFAULT_PLACE;
     try {
-      parseRoutine(text, place);
+      const items = parseRoutine(text, place);
+      if (current.row?.enabled) revisedDay = routineDay(items, now, place).day;
     } catch (error) {
       if (error instanceof RoutineError) return json(422, { error: error.code, line: error.line });
       throw error;
@@ -290,7 +292,8 @@ async function saveRoutine(request, env, me) {
   if (current.row?.enabled) {
     if (Object.hasOwn(body, 'text')) {
       const day = current.day?.day ?? zonedDate(now, current.row.tz);
-      const pendingFrom = new Date(Date.parse(`${day}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
+      const laterDay = day > revisedDay ? day : revisedDay;
+      const pendingFrom = new Date(Date.parse(`${laterDay}T00:00:00Z`) + DAY_MS).toISOString().slice(0, 10);
       await env.DB.prepare(
         'UPDATE routines SET pending_text = ?2, pending_from = ?3, updated_at = ?4 WHERE sub = ?1',
       ).bind(me.sub, text, pendingFrom, now).run();
