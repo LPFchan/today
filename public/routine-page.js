@@ -99,19 +99,13 @@ function render() {
     details.append(node('span', 'routine-item-name', item.name));
     const status = node('div', 'routine-item-status');
     status.append(node('span', '', t(`routinePhase_${item.phase}`)));
-    if (item.startedAt !== null && item.doneAt === null) status.append(node('span', '', t('routineStarted')));
     if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
     details.append(status);
     const buttons = node('div', 'routine-actions');
     if (keepout?.key === item.key) {
       keepoutActions(buttons, keepout);
-    } else if (item.phase === 'open' && item.doneAt === null) {
-      if (item.kind === 'window' && item.startedAt === null) {
-        buttons.append(actionButton('start', item, true));
-      } else if (!item.keepout) {
-        const doneAfter = (item.startedAt ?? item.start) + item.minMinutes * 60_000;
-        buttons.append(actionButton('done', item, true, doneAfter));
-      }
+    } else if (item.phase === 'open' && item.doneAt === null && item.kind === 'window' && item.startedAt === null) {
+      buttons.append(actionButton('start', item, true));
     }
     row.append(times, details, buttons);
     list.append(row);
