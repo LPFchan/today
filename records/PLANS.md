@@ -45,13 +45,6 @@ the board, the watch or the Mac app.
 
 ### Near Term
 
-- Phase 0 — Roborock on its own schedule:
-  - Why now: no code; set a daily run in the Roborock app inside the evening
-    outing window. Sunset moves through the year (Seoul: about 17:15 in
-    December, 19:55 in June), so the time needs nudging every couple of
-    months until phase 5 replaces it.
-  - Dependencies: none (operator, in the app).
-  - Related ids: DEC-20261005-001
 - Phase 2 — Mac overlay:
   - Why now: the first real enforcement.
   - Dependencies: phase 1; an auth gateway route that lets the Mac app's
@@ -89,8 +82,8 @@ the board, the watch or the Mac app.
     calorie estimate); 30+ minutes away from home via Find My; results posted
     to today to lift the lock. When Find My sees the operator leave home for
     the outing, brief starts the Roborock through python-roborock (the
-    library Home Assistant uses) and checks the run finished; the app's fixed
-    schedule from phase 0 is then removed.
+    library Home Assistant uses) and checks the run finished. The Roborock
+    has no schedule of its own; brief is the only thing that runs it.
   - Related ids: DEC-20261005-001
 - Phase 6 — away mode and affordances:
   - Why later: bypasses matter once the lock is real.
