@@ -148,9 +148,9 @@ function render() {
       details.append(status);
     } else {
       const status = node('div', 'routine-item-status');
-      status.append(node('span', '', t(`routinePhase_${item.phase}`)));
+      if (item.phase !== 'past') status.append(node('span', '', t(`routinePhase_${item.phase}`)));
       if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
-      details.append(status);
+      if (status.childElementCount) details.append(status);
     }
     const buttons = node('div', 'routine-actions');
     if (isKeepoutNow) {
