@@ -214,6 +214,9 @@ async function currentRoutine(env, me, now = Date.now()) {
     await upsertPerson(env, me, {
       schedule: serializeSchedule(parseSchedule(schedule.text)), anchor: schedule.anchor,
     });
+    const yesterday = new Date(Date.parse(`${day.day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
+    await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
+      .bind(me.sub, yesterday).run();
     await env.DB.prepare('UPDATE routines SET materialized_day = ?2 WHERE sub = ?1')
       .bind(me.sub, day.day).run();
     result.materialized = true;
@@ -340,10 +343,6 @@ async function routineStatus(request, env, me, action) {
         'ON CONFLICT (sub, day, key) DO UPDATE SET done_at = ?4',
     ).bind(me.sub, body.day, body.key, now).run();
   }
-  const yesterday = new Date(Date.parse(`${routine.day.day}T00:00:00Z`) - DAY_MS)
-    .toISOString().slice(0, 10);
-  await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
-    .bind(me.sub, yesterday).run();
   return json(200, await routineProfile(env, me));
 }
 

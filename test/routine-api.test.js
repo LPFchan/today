@@ -473,22 +473,25 @@ test('start and done reject the wrong day, unopened and unknown items, free time
   expectError(await status('done', '02:30-12:00'), 409, 'not_due');
 });
 
-test('status writes prune only this owner, keeping yesterday relative to the instance day', async (t) => {
-  const { enable, status, DB, at } = setup(t);
+test('new-day materialization prunes old status without start or done, keeping yesterday and other owners', async (t) => {
+  const { enable, call, DB, at } = setup(t);
   at('12:00', '2026-10-04');
   await enable();
-  at('03:00'); // Before noon: the current instance is October 4.
   const insert = DB.raw.prepare('INSERT INTO routine_status (sub, day, key, done_at) VALUES (?, ?, ?, ?)');
-  for (const day of ['2026-10-01', '2026-10-02', '2026-10-03']) insert.run('owner', day, 'old', 1);
+  const days = ['2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04', '2026-10-05'];
+  for (const day of days) insert.run('owner', day, 'old', 1);
   insert.run('other', '2026-10-01', 'old', 1);
-  assert.equal((await status('done', '12:00-12:20', '2026-10-04')).status, 200);
+  at('03:00'); // Before noon: the current instance is still October 4.
+  assert.equal((await call('GET', '/api/routine')).body.today.day, '2026-10-04');
   assert.deepEqual(DB.raw.prepare('SELECT day FROM routine_status WHERE sub = ? ORDER BY day').all('owner')
-    .map((row) => row.day), ['2026-10-03', '2026-10-04']);
-  at('12:30');
-  assert.equal((await status('done', '12:00-12:20')).status, 200);
-  assert.equal((await status('start', '12:30..14:00')).status, 200);
+    .map((row) => row.day), days);
+  at('12:00');
+  const next = await call('GET', '/api/routine');
+  assert.equal(next.status, 200);
+  assert.equal(next.body.today.day, '2026-10-05');
+  assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-05');
   assert.deepEqual(DB.raw.prepare('SELECT day FROM routine_status WHERE sub = ? ORDER BY day').all('owner')
-    .map((row) => row.day), ['2026-10-04', '2026-10-05', '2026-10-05']);
+    .map((row) => row.day), ['2026-10-04', '2026-10-05']);
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status WHERE sub = ?').get('other').n, 1);
 });
 
