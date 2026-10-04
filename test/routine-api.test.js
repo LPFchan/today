@@ -171,6 +171,54 @@ test('a visibility write paused across rollover cannot restore a stale schedule'
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
 });
 
+test('the plan write and day claim share one batch, including a first-time owner', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  const prepare = DB.prepare.bind(DB);
+  const batch = DB.batch.bind(DB);
+  const sqlByStatement = new WeakMap();
+  let batches = 0;
+  t.mock.method(DB, 'prepare', (sql) => {
+    const statement = prepare(sql);
+    return {
+      ...statement,
+      bind: (...values) => {
+        const bound = statement.bind(...values);
+        sqlByStatement.set(bound, sql);
+        return bound;
+      },
+    };
+  });
+  t.mock.method(DB, 'batch', async (statements) => {
+    assert.equal(statements.length, 2);
+    assert.match(sqlByStatement.get(statements[0]), /^UPDATE people SET schedule/);
+    assert.match(sqlByStatement.get(statements[0]), /EXISTS \(SELECT 1 FROM routines/);
+    assert.match(sqlByStatement.get(statements[1]), /^UPDATE routines SET materialized_day/);
+    assert.match(sqlByStatement.get(statements[1]), /materialized_day IS NOT/);
+    // The insert happens before the batch, so even the initial UPDATE has a row.
+    assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people WHERE sub = ?').get('owner').n, 1);
+    const results = await batch(statements);
+    assert.deepEqual(results.map((result) => result.meta.changes), [1, 1]);
+    batches++;
+    return results;
+  });
+  assert.equal((await enable()).status, 200);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:30'));
+  assert.equal(batches, 1);
+  at('12:00', '2026-10-06');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:00', '2026-10-06'));
+  assert.equal(batches, 2);
+});
+
+test('the D1 batch stand-in rolls back every statement on error and supports subsequent batches', async (t) => {
+  const { DB } = setup(t);
+  const insert = () => DB.prepare('INSERT INTO people (sub, name, updated_at) VALUES (?1, ?2, ?3)')
+    .bind('owner', 'owner', Date.now());
+  await assert.rejects(DB.batch([insert(), DB.prepare('INSERT INTO missing_table VALUES (1)')]), /no such table/);
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
+  assert.deepEqual(await DB.batch([insert()]), [{ meta: { changes: 1 } }]);
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 1);
+});
+
 test('concurrent rollover reads claim the day once and preserve a manual save between them', async (t) => {
   const { enable, call, at, DB } = setup(t);
   await enable();
@@ -180,6 +228,12 @@ test('concurrent rollover reads claim the day once and preserve a manual save be
   let holdSnapshot = true;
   let prunes = 0;
   const claims = [];
+  const batch = DB.batch.bind(DB);
+  t.mock.method(DB, 'batch', async (statements) => {
+    const results = await batch(statements);
+    claims.push(results[1].meta.changes);
+    return results;
+  });
   const paused = new Promise((resolve) => { pause = resolve; });
   const resumed = new Promise((resolve) => { resume = resolve; });
   t.mock.method(DB, 'prepare', (sql) => {
@@ -202,7 +256,6 @@ test('concurrent rollover reads claim the day once and preserve a manual save be
           },
           run: async () => {
             const written = await bound.run();
-            if (sql.includes('materialized_day IS NOT')) claims.push(written.meta.changes);
             if (sql.startsWith('DELETE FROM routine_status') && sql.includes('day <')) prunes++;
             return written;
           },

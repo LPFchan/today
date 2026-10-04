@@ -208,14 +208,19 @@ async function currentRoutine(env, me, now = Date.now()) {
   day.items = day.items.map((item) => item.end <= row.enabled_at
     ? { ...item, keepout: false } : item);
   if (row.materialized_day !== day.day) {
-    const claim = await env.DB.prepare(
-      'UPDATE routines SET materialized_day = ?2 WHERE sub = ?1 AND materialized_day IS NOT ?2',
-    ).bind(me.sub, day.day).run();
+    const schedule = routineSchedule(day);
+    await env.DB.prepare('INSERT OR IGNORE INTO people (sub, name, updated_at) VALUES (?1, ?2, ?3)')
+      .bind(me.sub, me.name, now).run();
+    const [, claim] = await env.DB.batch([
+      env.DB.prepare(
+        'UPDATE people SET schedule = ?3, anchor = ?4, updated_at = ?5 WHERE sub = ?1 ' +
+          'AND EXISTS (SELECT 1 FROM routines WHERE sub = ?1 AND materialized_day IS NOT ?2)',
+      ).bind(me.sub, day.day, serializeSchedule(parseSchedule(schedule.text)), schedule.anchor, now),
+      env.DB.prepare(
+        'UPDATE routines SET materialized_day = ?2 WHERE sub = ?1 AND materialized_day IS NOT ?2',
+      ).bind(me.sub, day.day),
+    ]);
     if (claim.meta.changes) {
-      const schedule = routineSchedule(day);
-      await upsertPerson(env, me, {
-        schedule: serializeSchedule(parseSchedule(schedule.text)), anchor: schedule.anchor,
-      });
       const yesterday = new Date(Date.parse(`${day.day}T00:00:00Z`) - DAY_MS).toISOString().slice(0, 10);
       await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
         .bind(me.sub, yesterday).run();
