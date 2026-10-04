@@ -1567,6 +1567,16 @@ textarea[aria-invalid='true'] {
   min-height: 44px;
 }
 
+.routine-page .btn:not(.primary) {
+  border-color: transparent;
+  color: var(--text);
+  background: var(--surface-2);
+}
+
+.routine-page .btn:not(.primary):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--surface-2) 88%, var(--text));
+}
+
 .routine-page .btn:disabled {
   opacity: 1;
   cursor: not-allowed;

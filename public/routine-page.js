@@ -91,7 +91,8 @@ function unlockSentence(needs) {
 }
 
 function actionButton(action, item, canAct, doneAfter = 0) {
-  const button = node('button', 'btn primary', t(action === 'start' ? 'start' : 'done'));
+  const isCurrentKeepout = routine.today.keepout?.key === item.key;
+  const button = node('button', isCurrentKeepout ? 'btn primary' : 'btn', t(action === 'start' ? 'start' : 'done'));
   button.type = 'button';
   button.dataset.allowed = String(canAct);
   button.dataset.action = action;
