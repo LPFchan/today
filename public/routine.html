@@ -28,13 +28,13 @@
       <section class="routine-section" aria-labelledby="routineTitle">
         <div class="routine-heading">
           <h1 id="routineTitle" data-t="routineTitle">auto-routine</h1>
-          <div class="routine-toggle-group">
+          <div id="routineToggleGroup" class="routine-toggle-group">
             <label class="routine-toggle">
               <input id="routineEnabled" type="checkbox" role="switch" aria-describedby="routineExplanation routineDisableHint" disabled />
               <span class="routine-switch-track" aria-hidden="true"></span>
               <span class="sr-only" data-t="routineEnabled">auto-routine</span>
             </label>
-            <p id="routineDisableHint" class="field-hint" data-t="routineDisableHint" hidden>To turn it off, ask Hermes.</p>
+            <p id="routineDisableHint" class="routine-switch-hint" role="tooltip" data-t="routineDisableHint" hidden>To turn it off, ask Hermes.</p>
           </div>
         </div>
         <p id="routineExplanation" class="routine-muted" data-t="routineExplanation">auto-routine repeats each day. Keepout items lock your devices and coding work until they’re finished.</p>
@@ -45,7 +45,6 @@
       <section id="routineToday" class="routine-section" aria-labelledby="routineTodayTitle" hidden>
         <div class="routine-heading">
           <h2 id="routineTodayTitle" data-t="routineToday">Today’s auto-routine</h2>
-          <p id="routineDay" class="routine-muted"></p>
         </div>
         <p id="routineItemsEmpty" class="routine-muted" data-t="routineOff" hidden>Your auto-routine is off. Turn it on whenever you’re ready.</p>
         <ol id="routineItems" class="routine-items"></ol>

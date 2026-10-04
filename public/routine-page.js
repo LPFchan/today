@@ -1,4 +1,4 @@
-import { t, translatePage } from './i18n.js';
+import { lang, t, translatePage } from './i18n.js';
 
 translatePage();
 document.title = `${t('routineTitle')} · today`;
@@ -10,6 +10,12 @@ const save = $('routineSave');
 const message = $('routineMessage');
 const errorLine = $('routineError');
 const retry = $('routineRetry');
+const toggleGroup = $('routineToggleGroup');
+const disableHint = $('routineDisableHint');
+let hintPinned = false;
+let hintHovered = false;
+let hintDismissed = false;
+let lastPointerType = 'mouse';
 let routine = null;
 let busy = false;
 let signedOut = false;
@@ -21,13 +27,46 @@ function dirty() {
 function updateControls() {
   enabled.checked = routine?.enabled ?? false;
   enabled.disabled = busy || !routine || signedOut || routine.enabled;
-  $('routineDisableHint').hidden = !routine?.enabled;
+  const showHintTrigger = Boolean(routine?.enabled);
+  toggleGroup.tabIndex = showHintTrigger ? 0 : -1;
+  if (showHintTrigger) {
+    toggleGroup.setAttribute('role', 'button');
+    toggleGroup.setAttribute('aria-label', t('routineEnabled'));
+    toggleGroup.setAttribute('aria-describedby', 'routineDisableHint');
+  } else {
+    toggleGroup.removeAttribute('role');
+    toggleGroup.removeAttribute('aria-label');
+    toggleGroup.removeAttribute('aria-describedby');
+    hintPinned = false;
+  }
+  updateHint();
   editor.disabled = !routine || signedOut;
   save.disabled = busy || !routine || signedOut || !dirty();
   retry.disabled = busy;
   $('routineDraft').hidden = !dirty();
   $('routineMain').setAttribute('aria-busy', String(busy));
   updateCountdowns();
+}
+
+function updateHint() {
+  const hover = hintHovered;
+  const focus = toggleGroup.contains(document.activeElement);
+  const visible = Boolean(routine?.enabled) && !hintDismissed && (hintPinned || hover || focus);
+  disableHint.hidden = !visible;
+  if (routine?.enabled) toggleGroup.setAttribute('aria-expanded', String(visible));
+  else toggleGroup.removeAttribute('aria-expanded');
+}
+
+function pendingDate(day) {
+  const [year, month, date] = day.split('-').map(Number);
+  // A date-only API value is a calendar date, not a UTC midnight timestamp.
+  const start = new Date(year, month - 1, date);
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const isTomorrow = start.getFullYear() === tomorrow.getFullYear()
+    && start.getMonth() === tomorrow.getMonth() && start.getDate() === tomorrow.getDate();
+  const formatted = new Intl.DateTimeFormat(lang, { month: 'short', day: 'numeric' }).format(start);
+  return isTomorrow ? t('routineTomorrow', { date: formatted }) : formatted;
 }
 
 // Use the browser's local clock, but always render 24-hour ASCII HH:MM.
@@ -69,9 +108,8 @@ function render() {
   const keepout = today?.keepout;
   $('routineToday').hidden = false;
   $('routinePending').hidden = !routine.pendingFrom;
-  $('routinePending').textContent = routine.pendingFrom ? t('routinePending', { date: routine.pendingFrom }) : '';
+  $('routinePending').textContent = routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : '';
 
-  $('routineDay').textContent = today ? t('routineDayZone', { day: today.day, tz: routine.tz }) : '';
   $('routineItemsEmpty').hidden = Boolean(today?.items.length);
   $('routineItemsEmpty').textContent = t(routine.enabled ? 'routineNoItems' : 'routineOff');
   const list = $('routineItems');
@@ -161,6 +199,11 @@ function accept(data, savedText) {
   signedOut = false;
   if (!preserveDraft) editor.value = routine.text;
   render();
+  // Commit the first checked state before allowing switch transitions.
+  if (!document.body.classList.contains('routine-ready')) {
+    void enabled.offsetWidth;
+    document.body.classList.add('routine-ready');
+  }
 }
 
 function reportError(error, inEditor = false) {
@@ -215,7 +258,7 @@ async function mutate(method, path, body, inEditor = false) {
   try {
     accept(await request(method, path, body), body.text);
     message.textContent = body.text !== undefined
-      ? routine.pendingFrom ? t('routinePending', { date: routine.pendingFrom }) : t('routineSaved')
+      ? routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : t('routineSaved')
       : t(method === 'PUT' ? 'routineTurnedOn' : 'routineUpdated');
     retry.hidden = true;
   } catch (error) {
@@ -229,6 +272,56 @@ async function mutate(method, path, body, inEditor = false) {
     updateControls();
   }
 }
+
+toggleGroup.addEventListener('pointerenter', (event) => {
+  if (event.pointerType === 'mouse') {
+    hintHovered = true;
+    hintDismissed = false;
+    updateHint();
+  }
+});
+toggleGroup.addEventListener('pointerleave', () => {
+  hintHovered = false;
+  if (!hintPinned) hintDismissed = false;
+  updateHint();
+});
+toggleGroup.addEventListener('pointerdown', (event) => { lastPointerType = event.pointerType; });
+toggleGroup.addEventListener('focusin', () => {
+  hintDismissed = false;
+  updateHint();
+});
+toggleGroup.addEventListener('focusout', () => {
+  hintPinned = false;
+  updateHint();
+});
+toggleGroup.addEventListener('click', (event) => {
+  if (!routine?.enabled) return;
+  event.preventDefault();
+  if (lastPointerType === 'touch' || event.detail === 0) {
+    hintPinned = !hintPinned;
+    hintDismissed = !hintPinned;
+    updateHint();
+  }
+});
+toggleGroup.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    hintPinned = false;
+    hintDismissed = true;
+    updateHint();
+  } else if (event.target === toggleGroup && (event.key === 'Enter' || event.key === ' ')) {
+    event.preventDefault();
+    hintPinned = !hintPinned;
+    hintDismissed = !hintPinned;
+    updateHint();
+  }
+});
+document.addEventListener('pointerdown', (event) => {
+  if (!toggleGroup.contains(event.target)) {
+    hintPinned = false;
+    hintDismissed = true;
+    updateHint();
+  }
+});
 
 enabled.addEventListener('change', () => {
   if (!routine?.enabled && enabled.checked) mutate('PUT', '/api/routine', { enabled: true });

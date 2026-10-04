@@ -1336,7 +1336,8 @@ textarea[aria-invalid='true'] {
   display: grid;
   gap: 14px;
   margin-bottom: 24px;
-  padding: 22px;
+  --routine-card-padding: 22px;
+  padding: var(--routine-card-padding);
   border: 1px solid var(--hair);
   border-radius: 12px;
   background: var(--surface);
@@ -1366,9 +1367,30 @@ textarea[aria-invalid='true'] {
 }
 
 .routine-page .routine-toggle-group {
+  position: relative;
   display: grid;
   justify-items: end;
-  gap: 2px;
+}
+
+.routine-page .routine-switch-hint {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 4px);
+  right: 0;
+  width: max-content;
+  max-width: min(240px, calc(100vw - 64px));
+  padding: 8px 12px;
+  border: 1px solid var(--hair);
+  border-radius: 8px;
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 4px 16px var(--hair);
+  font-size: 12px;
+}
+
+.routine-page .routine-toggle-group:focus-visible .routine-switch-track {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 .routine-page .routine-toggle {
@@ -1396,6 +1418,9 @@ textarea[aria-invalid='true'] {
   border: 1px solid var(--line);
   border-radius: 999px;
   background: var(--surface-2);
+}
+
+.routine-page.routine-ready .routine-switch-track {
   transition: background-color 150ms, border-color 150ms;
 }
 
@@ -1408,6 +1433,9 @@ textarea[aria-invalid='true'] {
   border-radius: 50%;
   background: #fff;
   content: '';
+}
+
+.routine-page.routine-ready .routine-switch-track::before {
   transition: transform 150ms;
 }
 
@@ -1427,7 +1455,11 @@ textarea[aria-invalid='true'] {
 
 .routine-page .routine-toggle input:disabled ~ span {
   opacity: 0.55;
-  cursor: not-allowed;
+  cursor: help;
+}
+
+.routine-page .routine-toggle input:disabled {
+  pointer-events: none;
 }
 
 .routine-page .routine-muted {
@@ -1459,11 +1491,11 @@ textarea[aria-invalid='true'] {
 }
 
 .routine-page .routine-item.is-keepout-now {
-  margin-block: 8px;
-  padding: 16px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 10px;
+  margin-inline: calc(-1 * var(--routine-card-padding));
+  padding-inline: var(--routine-card-padding);
+  border-top-color: transparent;
   background: var(--accent-soft);
+  box-shadow: inset 3px 0 var(--accent);
 }
 
 .routine-page .routine-item.is-keepout-now .routine-item-status {
@@ -1594,7 +1626,7 @@ textarea[aria-invalid='true'] {
   }
 
   .routine-page .routine-section {
-    padding: 16px;
+    --routine-card-padding: 16px;
   }
 
   .routine-page .routine-item {
