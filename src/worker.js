@@ -377,7 +377,7 @@ async function board(env, me) {
   const people = [];
   for (let row of results) {
     const routine = await currentRoutine(env, row, now);
-    if (routine.materialized) row = await person(env, row.sub);
+    if (routine.row?.enabled) row = await person(env, row.sub);
     const items = itemsOf(row);
     const current = items.length && items.at(-1).end > now - BOARD_KEEP_MS;
     people.push({

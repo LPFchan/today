@@ -124,6 +124,53 @@ test('enabling materializes the routine into the profile, watch and public board
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-05');
 });
 
+test('the board reloads enabled owners materialized after its people snapshot', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  await call('PUT', '/api/visibility', { visibility: 'public' });
+  const prepare = DB.prepare.bind(DB);
+  let pause;
+  let resume;
+  const paused = new Promise((resolve) => { pause = resolve; });
+  const resumed = new Promise((resolve) => { resume = resolve; });
+  t.mock.method(DB, 'prepare', (sql) => {
+    const statement = prepare(sql);
+    if (!sql.includes("FROM people WHERE visibility = 'public'")) return statement;
+    return {
+      ...statement,
+      bind: (...values) => {
+        const bound = statement.bind(...values);
+        return {
+          ...bound,
+          all: async () => {
+            const snapshot = await bound.all();
+            assert.equal(snapshot.results[0].anchor, instant('00:00'));
+            pause();
+            await resumed;
+            return snapshot;
+          },
+        };
+      },
+    };
+  });
+  at('12:00', '2026-10-06');
+  const board = call('GET', '/api/board', undefined, 'viewer');
+  await paused;
+  let today;
+  try {
+    today = (await call('GET', '/api/routine')).body.today;
+    assert.equal(today.day, '2026-10-06');
+  } finally {
+    resume();
+  }
+  const result = await board;
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.people, [{
+    name: 'owner', me: false, visibility: 'public',
+    items: today.items.map(({ start, end, name }) => ({ start, end, name })),
+  }]);
+});
+
 test('a visibility write paused across rollover cannot restore a stale schedule', async (t) => {
   const { enable, call, at, DB } = setup(t);
   await enable();
