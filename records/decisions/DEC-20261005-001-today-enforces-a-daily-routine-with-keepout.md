@@ -102,7 +102,10 @@ choice: strict).
 - today gains a recurring routine, window items, per-item status, keepout
   state and an affordance API; the SPEC non-goal "no history" relaxes to
   keeping enough of yesterday for the brief to report misses.
-- The Mac app gains a full-screen overlay.
+- The Mac app gains a full-screen overlay and, for its owner's routine items
+  only, a write path; the SPEC invariant that the Mac app edits nothing
+  narrows accordingly. brief and Hermes also need authenticated write routes
+  through the auth gateway.
 - brief becomes the orchestrator of proofs: wake-up audio over SSH (MacBook
   first, dumpling as backup), meal photos judged by the Hermes model with a
   calorie estimate, Find My checks via findmy-mcp on dumpling, and Roborock

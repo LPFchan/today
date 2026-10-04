@@ -23,7 +23,7 @@ Do not put raw brainstorms or untriaged intake here.
   design and routine agreed in DEC-20261005-001.
 - Expected value: regular sleep, meals, hygiene and daylight, without relying
   on willpower during hyperfocus.
-- Preconditions: findmy-mcp running on dumpling (being built 2026-10-05).
+- Preconditions: findmy-mcp running on dumpling (live since 2026-10-05).
 - Earliest likely start: now.
 - Related ids: DEC-20261005-001
 
@@ -35,6 +35,7 @@ Who owns what:
 | brief | proofs and alarms: wake-up audio over SSH (MacBook, then dumpling), meal photo judging with calorie estimate, Find My away-from-home check, Roborock check, reporting misses and bypasses |
 | findmy-cli fork | findmy-mcp, hosted persistently on dumpling |
 | setup | one shared keepout check called by every coding harness's hook, plus the line in the global agent instructions |
+| auth | gateway routes and tokens for the new callers: the Mac app marking items started or done, brief posting proofs, Hermes granting affordances, the keepout check reading state |
 
 Product rule for every phase: routine and keepout are opt-in per person and
 off by default. Users who haven't opted in (marie) see no change on the web,
@@ -59,7 +60,9 @@ the board, the watch or the Mac app.
   - Related ids: DEC-20261005-001
 - Phase 2 — Mac overlay:
   - Why now: the first real enforcement.
-  - Dependencies: phase 1.
+  - Dependencies: phase 1; an auth gateway route that lets the Mac app's
+    `today` token mark its owner's routine items started or done (today the
+    Mac app is read-only).
   - Scope: full-screen overlay over every display while keepout is due,
     showing the item and what unlocks it, with a "done" button for
     honor-system items and a "starting now" button for window items.
@@ -69,7 +72,7 @@ the board, the watch or the Mac app.
   - Related ids: DEC-20261005-001
 - Phase 3 — agent keepout:
   - Why now: closes the "code over SSH from another machine" gap.
-  - Dependencies: phases 1–2 (the overlay's "done" button is how a keepout item ends); operator approval of the global agent-instructions edit.
+  - Dependencies: phases 1–2 (the overlay's "done" button is how a keepout item ends); a token the check can use to read keepout state from any machine; operator approval of the global agent-instructions edit.
   - Scope: one `today-keepout` check in setup; Claude Code `UserPromptSubmit`,
     Codex `hooks.json` `UserPromptSubmit`, Gemini `BeforeAgent`, OpenCode
     tool-call blocking, a zsh launch wrapper for harnesses without hooks.
@@ -86,14 +89,16 @@ the board, the watch or the Mac app.
   - Related ids: DEC-20261005-001
 - Phase 5 — proofs in brief:
   - Why later: needs item status in today to write into.
-  - Dependencies: phase 1; findmy-mcp on dumpling.
+  - Dependencies: phase 1; findmy-mcp on dumpling; an auth gateway route and
+    service credential that let brief write proof results for the operator.
   - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
     calorie estimate); 30+ minutes away from home via Find My; results posted
     to today to lift the lock.
   - Related ids: DEC-20261005-001
 - Phase 6 — away mode and affordances:
   - Why later: bypasses matter once the lock is real.
-  - Dependencies: phases 1, 5.
+  - Dependencies: phases 1, 4, 5 (every proof exists before the temporary
+    "done" path goes away); an auth route that lets Hermes grant affordances.
   - Scope: away mode set at least a day ahead; a Hermes tool that grants one
     item for today only, with a guideline to weigh the request; brief reports
     misses and bypasses each morning.
