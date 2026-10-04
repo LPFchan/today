@@ -202,6 +202,39 @@ test('text edits while off apply immediately without writing a day plan', async 
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '12:30'));
 });
 
+test('an immediate text change clears this owner’s progress before same-day re-enabling', async (t) => {
+  const { enable, call, status, at, DB } = setup(t);
+  await enable();
+  assert.equal((await status('start', '12:30..14:00')).status, 200);
+  at('12:50');
+  const completed = await status('done', '12:30..14:00');
+  assert.equal(completed.body.today.items.find((item) => item.key === '12:30..14:00').phase, 'done');
+  const originalStatus = DB.raw.prepare('SELECT * FROM routine_status WHERE sub = ?').all('owner');
+  assert.equal((await call('PUT', '/api/routine', { text: ROUTINE.replace('Meal', 'Pending meal') })).status, 200);
+  assert.deepEqual(DB.raw.prepare('SELECT * FROM routine_status WHERE sub = ?').all('owner'), originalStatus);
+  DB.raw.prepare('UPDATE routines SET enabled = 0 WHERE sub = ?').run('owner');
+  assert.equal((await call('PUT', '/api/routine', { text: ROUTINE })).status, 200);
+  assert.deepEqual(DB.raw.prepare('SELECT * FROM routine_status WHERE sub = ?').all('owner'), originalStatus);
+  assert.equal((await call('PUT', '/api/routine', { text: 'invalid' })).status, 422);
+  assert.deepEqual(DB.raw.prepare('SELECT * FROM routine_status WHERE sub = ?').all('owner'), originalStatus);
+  DB.raw.prepare('INSERT INTO routine_status (sub, day, key, done_at) VALUES (?, ?, ?, ?)')
+    .run('owner', '2026-10-04', '12:30..14:00', instant('12:50', '2026-10-04'));
+  DB.raw.prepare('INSERT INTO routine_status (sub, day, key, done_at) VALUES (?, ?, ?, ?)')
+    .run('other', '2026-10-05', '12:30..14:00', instant('12:50'));
+  const revised = ROUTINE.replace('Meal', 'Different meal');
+  assert.equal((await call('PUT', '/api/routine', { text: revised })).status, 200);
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status WHERE sub = ?').get('owner').n, 0);
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status WHERE sub = ?').get('other').n, 1);
+  const reenabled = await call('PUT', '/api/routine', { enabled: true });
+  assert.equal(reenabled.status, 200);
+  const meal = reenabled.body.today.items.find((item) => item.key === '12:30..14:00');
+  assert.equal(meal.name, 'Different meal');
+  assert.equal(meal.startedAt, null);
+  assert.equal(meal.doneAt, null);
+  assert.equal(meal.phase, 'open');
+  assert.equal((await status('start', meal.key)).body.today.keepout.key, meal.key);
+});
+
 test('a second edit replaces pending text; enabling and invalid edits leave it alone', async (t) => {
   const { enable, call, at, DB } = setup(t);
   await enable();

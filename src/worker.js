@@ -294,6 +294,9 @@ async function saveRoutine(request, env, me) {
       'materialized_day = CASE WHEN enabled = 0 AND ?3 = 1 ' +
         'THEN NULL ELSE materialized_day END',
   ).bind(me.sub, text, Number(enabled), now, enabled ? now : 0).run();
+  if (current.row && text !== current.row.text) {
+    await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1').bind(me.sub).run();
+  }
   return json(200, await routineProfile(env, me));
 }
 
