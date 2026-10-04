@@ -52,6 +52,9 @@ const el = {
 
 const MINUTE = 60_000;
 const BOARD_REFRESH_MS = 60_000;
+// A finished day is re-checked this often, so an auto-routine's next day
+// shows up without a reload.
+const FINISHED_REFRESH_MS = 60_000;
 
 const state = {
   me: null, // { sub, name, email }
@@ -816,6 +819,10 @@ setInterval(() => {
 setInterval(() => {
   if (document.visibilityState === 'visible' && state.view === 'everyone') loadBoard();
 }, BOARD_REFRESH_MS);
+setInterval(() => {
+  if (document.visibilityState !== 'visible' || state.view !== 'mine' || !state.me) return;
+  if (dayState(state.items, Date.now()).kind === 'finished') loadProfile().catch(() => {});
+}, FINISHED_REFRESH_MS);
 
 translatePage();
 renderAlert();
