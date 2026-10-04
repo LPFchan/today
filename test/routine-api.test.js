@@ -392,7 +392,14 @@ test('status writes prune only this owner, keeping yesterday relative to the ins
 
 test('enabling at 02:10 skips ended keepouts while ongoing and next items still lock', async (t) => {
   const { enable, call, status, at, DB } = setup(t, '02:10');
-  const enabled = await enable(DEFAULT_ROUTINE);
+  const text = `12:00-12:20 Wake ! until wake, done
+12:30..14:00 Meal ! until photo; min 20m
+14:00-sunset-1h Free
+sunset-1h..sunset Outing ! until away 30m, photo
+sunset-02:00 Free
+02:00-02:30 Hygiene ! until done
+02:30-12:00 Sleep !`;
+  const enabled = await enable(text);
   assert.equal(enabled.status, 200);
   assert.equal(enabled.body.today.day, '2026-10-04');
   assert.equal(enabled.body.today.keepout.key, '02:00-02:30');
