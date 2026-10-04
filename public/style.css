@@ -220,7 +220,6 @@ svg {
   align-items: center;
   gap: 12px;
   padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
-  border-bottom: 1px solid var(--hair);
   background: var(--bg);
 }
 
