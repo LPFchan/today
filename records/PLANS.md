@@ -52,15 +52,6 @@ the board, the watch or the Mac app.
     months until phase 5 replaces it.
   - Dependencies: none (operator, in the app).
   - Related ids: DEC-20261005-001
-- Phase 1 — routine and keepout state in today:
-  - Why now: everything else reads from it.
-  - Dependencies: none.
-  - Scope: opt-in flag; a recurring routine that becomes each day's plan;
-    fixed and window items (opens, start trigger, deadline, unlock
-    conditions, minimum lock time); sunset computed for Seoul; per-item
-    status for today and yesterday; a keepout endpoint ("is a keepout item
-    due right now, and which"); editing the routine in the web UI.
-  - Related ids: DEC-20261005-001
 - Phase 2 — Mac overlay:
   - Why now: the first real enforcement.
   - Dependencies: phase 1; an auth gateway route that lets the Mac app's
@@ -106,6 +97,7 @@ the board, the watch or the Mac app.
   - Dependencies: phases 1, 4, 5 (every proof exists before the temporary
     "done" path goes away); an auth route that lets Hermes grant affordances.
   - Scope: away mode set at least a day ahead; a Hermes tool that grants one
-    item for today only, with a guideline to weigh the request; brief reports
+    item for today only, or switches auto-routine off (DEC-20261005-002), with
+    a guideline to weigh the request; brief reports
     misses and bypasses each morning.
   - Related ids: DEC-20261005-001

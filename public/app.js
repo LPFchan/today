@@ -52,6 +52,11 @@ const el = {
 
 const MINUTE = 60_000;
 const BOARD_REFRESH_MS = 60_000;
+// An auto-routine writes the next day's plan on the server, so a visible
+// timer re-reads the plan: every minute once the day is finished or empty,
+// otherwise every few minutes.
+const PLAN_CHECK_MS = 60_000;
+const PLAN_REFRESH_MS = 5 * 60_000;
 
 const state = {
   me: null, // { sub, name, email }
@@ -59,6 +64,9 @@ const state = {
   schedule: null, // { text, anchor }
   items: [], // absolute items of my schedule
   board: null, // { people }
+  profileAt: 0, // when /api/me was last requested
+  profileSeq: 0, // bumped by every applied profile
+  profileReads: 0, // bumped by every started /api/me read
   view: location.pathname.startsWith('/everyone') ? 'everyone' : 'mine',
   completed: null,
   pendingStart: null,
@@ -134,12 +142,17 @@ async function request(method, path, body) {
 }
 
 function applyProfile(profile) {
+  state.profileSeq += 1;
   const switched = state.me && state.me.sub !== profile.me.sub;
+  // A refresh that returns the same plan keeps completion tracking, so an
+  // item ending mid-request still flashes and chimes.
+  const samePlan = state.schedule?.text === profile.schedule?.text
+    && state.schedule?.anchor === profile.schedule?.anchor;
   state.me = profile.me;
   state.visibility = profile.visibility;
   state.schedule = profile.schedule;
   state.items = profile.schedule ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor) : [];
-  state.completed = null;
+  if (!samePlan) state.completed = null;
   if (switched) location.reload();
   renderAccount();
   renderVisibility();
@@ -147,7 +160,12 @@ function applyProfile(profile) {
 }
 
 async function loadProfile() {
-  applyProfile(await request('GET', '/api/me'));
+  state.profileAt = Date.now();
+  const seq = state.profileSeq;
+  const read = ++state.profileReads;
+  const profile = await request('GET', '/api/me');
+  // Only the latest read applies, and not if a save landed meanwhile.
+  if (read === state.profileReads && state.profileSeq === seq) applyProfile(profile);
 }
 
 async function loadBoard() {
@@ -816,6 +834,14 @@ setInterval(() => {
 setInterval(() => {
   if (document.visibilityState === 'visible' && state.view === 'everyone') loadBoard();
 }, BOARD_REFRESH_MS);
+setInterval(() => {
+  if (document.visibilityState !== 'visible' || state.view !== 'mine' || !state.me) return;
+  const now = Date.now();
+  const kind = dayState(state.items, now).kind;
+  if (kind === 'finished' || kind === 'empty' || now - state.profileAt >= PLAN_REFRESH_MS) {
+    loadProfile().catch(() => {});
+  }
+}, PLAN_CHECK_MS);
 
 translatePage();
 renderAlert();

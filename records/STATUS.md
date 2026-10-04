@@ -2,12 +2,12 @@
 
 ## Snapshot
 
-- Last updated: 2026-09-23
+- Last updated: 2026-10-05
 - Overall posture: `active`
 - Current focus: first real use by the operator and marie, on the web, the watch and the Mac
 - Highest-priority blocker: none
 - Next operator decision needed: none
-- Related decisions: DEC-20260923-003, DEC-20260925-001
+- Related decisions: DEC-20260923-003, DEC-20260925-001, DEC-20261005-001, DEC-20261005-002
 
 ## Current State Summary
 
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-05:
+  - Change: auto-routine (phase 1 of the routine plan) ships at `/routine`: the routine writes each day's plan, `/api/keepout` reports the current lock, items unlock with a Done button until proofs land.
+  - Why it matters: the operator's routine runs itself; the Mac overlay (phase 2) and agent keepout (phase 3) read `/api/keepout`.
 
 - 2026-09-25:
   - Change: the watch signs in through the hub's device login; today's `/pair` mailbox is gone.

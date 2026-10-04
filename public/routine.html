@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f7f7f5" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151619" media="(prefers-color-scheme: dark)" />
+    <title>auto-routine · today</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/routine-page.js"></script>
+  </head>
+  <body class="routine-page">
+    <a class="skip-link" href="#routineMain" data-t="routineSkip">Skip to auto-routine</a>
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="today">
+        <svg aria-hidden="true" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5V12l3 2" /></svg>
+        <span>today</span>
+      </a>
+      <span class="section-label" data-t="routineTitle">auto-routine</span>
+    </header>
+    <main id="routineMain" class="routine-main" tabindex="-1">
+      <section class="routine-section" aria-labelledby="routineTitle">
+        <div class="routine-heading">
+          <h1 id="routineTitle" data-t="routineTitle">auto-routine</h1>
+          <div id="routineToggleGroup" class="routine-toggle-group">
+            <label class="routine-toggle">
+              <input id="routineEnabled" type="checkbox" role="switch" aria-describedby="routineExplanation routineDisableHint" disabled />
+              <span class="routine-switch-track" aria-hidden="true"></span>
+              <span class="sr-only" data-t="routineEnabled">auto-routine</span>
+            </label>
+            <p id="routineDisableHint" class="routine-switch-hint" role="tooltip" data-t="routineDisableHint" hidden>To turn it off, ask Hermes.</p>
+          </div>
+        </div>
+        <p id="routineExplanation" class="routine-muted" data-t="routineExplanation">auto-routine fills in your day so you don't have to write a plan every morning. Locked items limit your computer until they're cleared.</p>
+        <p id="routineMessage" class="routine-message" role="status" data-t="routineLoading">Loading your auto-routine…</p>
+        <button id="routineRetry" class="btn" type="button" data-t="routineRetry" hidden>Try again</button>
+      </section>
+
+      <section id="routineToday" class="routine-section" aria-labelledby="routineTodayTitle" hidden>
+        <div class="routine-heading">
+          <h2 id="routineTodayTitle" data-t="routineToday">Today’s auto-routine</h2>
+        </div>
+        <p id="routineItemsEmpty" class="routine-muted" data-t="routineOff" hidden>Your auto-routine is off. Turn it on whenever you’re ready.</p>
+        <ol id="routineItems" class="routine-items"></ol>
+      </section>
+
+      <section class="routine-section" aria-labelledby="routineEditorTitle">
+        <h2 id="routineEditorTitle" data-t="routineEditorTitle">Your repeating plan</h2>
+        <form id="routineForm">
+          <label for="routineText" class="sr-only" data-t="routineEditorLabel">auto-routine text</label>
+          <textarea id="routineText" spellcheck="false" aria-describedby="routineEditorHint routinePending routineError" disabled></textarea>
+          <p id="routineEditorHint" class="field-hint" data-t="routineEditorHint">One item per line. While auto-routine is on, edits apply from the next day.</p>
+          <p id="routinePending" class="field-hint" hidden></p>
+          <p id="routineError" class="field-error" role="alert" hidden></p>
+          <div class="routine-actions">
+            <button id="routineSave" class="btn" type="submit" data-t="save" disabled>Save</button>
+            <span id="routineDraft" class="field-hint" data-t="routineUnsaved" hidden>Unsaved changes</span>
+          </div>
+        </form>
+        <details class="routine-help">
+          <summary data-t="routineHelp">How to write an auto-routine</summary>
+          <pre><code>12:00-12:20 wake up, wash face, brush teeth ! until wake, done
+12:30..14:00 lunch ! until photo; min 20m
+14:00-sunset-1h free time
+sunset-1h..sunset evening outing and dinner ! until away 30m, photo
+sunset-02:30 free time
+02:30-03:00 wash face, brush teeth ! until done
+03:00-12:00 sleep !</code></pre>
+          <dl>
+            <dt><code>a-b</code></dt><dd data-t="routineHelpFixed">Fixed start and end.</dd>
+            <dt><code>a..b</code></dt><dd data-t="routineHelpWindow">A window: opens at a, due by b.</dd>
+            <dt><code>sunset±offset</code></dt><dd data-t="routineHelpSunset">Follows sunset in Seoul, with an optional offset.</dd>
+            <dt><code> ! </code></dt><dd data-t="routineHelpKeepout">Keepout: locks you out while this item is due.</dd>
+            <dt><code>a-b free time</code></dt><dd data-t="routineHelpNormal">No ` ! ` = a normal block, no lock.</dd>
+            <dt><code>until</code></dt><dd data-t="routineHelpUntil">What unlocks it: done, wake, photo, or away 30m.</dd>
+            <dt><code>min 20m</code></dt><dd data-t="routineHelpMin">The shortest lock, counted from the start.</dd>
+          </dl>
+          <p class="field-hint" data-t="routineTemporaryDone">For now, Done also acknowledges wake, photo and away items. Proofs will come later.</p>
+        </details>
+      </section>
+    </main>
+  </body>
+</html>
