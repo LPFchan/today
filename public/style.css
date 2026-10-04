@@ -1490,7 +1490,7 @@ textarea[aria-invalid='true'] {
   border-top: 1px solid var(--hair);
 }
 
-.routine-page .routine-item.is-keepout-now {
+.routine-page .routine-item.is-now {
   margin-inline: calc(-1 * var(--routine-card-padding));
   padding-inline: var(--routine-card-padding);
   border-top-color: transparent;

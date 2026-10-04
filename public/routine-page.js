@@ -91,8 +91,7 @@ function unlockSentence(needs) {
 }
 
 function actionButton(action, item, canAct, doneAfter = 0) {
-  const isCurrentKeepout = routine.today.keepout?.key === item.key;
-  const button = node('button', isCurrentKeepout ? 'btn primary' : 'btn', t(action === 'start' ? 'start' : 'done'));
+  const button = node('button', item.key === nowKey() ? 'btn primary' : 'btn', t(action === 'start' ? 'start' : 'done'));
   button.type = 'button';
   button.dataset.allowed = String(canAct);
   button.dataset.action = action;
@@ -112,6 +111,14 @@ function keepoutActions(container, state) {
   }
 }
 
+// The row to look at: the active keepout, otherwise the item happening now.
+function nowKey() {
+  const today = routine.today;
+  if (today?.keepout) return today.keepout.key;
+  const now = Date.now();
+  return today?.items.find((item) => item.phase !== 'done' && item.start <= now && now < item.end)?.key ?? null;
+}
+
 function render() {
   const today = routine.today;
   const keepout = today?.keepout;
@@ -123,9 +130,10 @@ function render() {
   $('routineItemsEmpty').textContent = t(routine.enabled ? 'routineNoItems' : 'routineOff');
   const list = $('routineItems');
   list.replaceChildren();
+  const current = nowKey();
   for (const item of today?.items ?? []) {
     const isKeepoutNow = keepout?.key === item.key;
-    const row = node('li', `routine-item is-${item.phase}${isKeepoutNow ? ' is-keepout-now' : ''}`);
+    const row = node('li', `routine-item is-${item.phase}${item.key === current ? ' is-now' : ''}`);
     const times = node('div', 'routine-item-time');
     times.append(node('span', '', `${clock(item.start)}–${clock(item.end)}`));
     const details = node('div', 'routine-item-details');
@@ -143,9 +151,9 @@ function render() {
         node('span', 'routine-muted', unlocks),
       );
       details.append(status);
-    } else {
+    } else if (item.phase !== 'done' && item.phase !== 'past') {
       const status = node('div', 'routine-item-status');
-      if (item.phase !== 'past' && item.phase !== 'upcoming' && item.phase !== 'open') {
+      if (item.phase === 'locked' || item.phase === 'missed') {
         status.append(node('span', '', t(`routinePhase_${item.phase}`)));
       }
       if (item.keepout) {
