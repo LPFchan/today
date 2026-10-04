@@ -15,7 +15,7 @@ Do not put raw brainstorms or untriaged intake here.
 ### Daily routine with keepout
 
 - Outcome: the operator's day runs on a recurring routine (wake 12:00, face
-  and teeth twice, two floating meals, an evening outing before sunset, sleep
+  and teeth twice, two floating meals, an evening outing that starts before sunset, sleep
   at 03:00). Keepout items lock the Mac and stop coding agents until their
   proof arrives. Away mode and Hermes-granted affordances are the only ways
   around it, and the morning brief reports every miss and bypass.
@@ -63,6 +63,9 @@ the board, the watch or the Mac app.
   - Scope: full-screen overlay over every display while keepout is due,
     showing the item and what unlocks it, with a "done" button for
     honor-system items and a "starting now" button for window items.
+    Until phases 4 and 5 land, items whose proof isn't built yet (wake-up,
+    meals, outing) complete with the same "done" button, so no lock can
+    become impossible to lift.
   - Related ids: DEC-20261005-001
 - Phase 3 — agent keepout:
   - Why now: closes the "code over SSH from another machine" gap.

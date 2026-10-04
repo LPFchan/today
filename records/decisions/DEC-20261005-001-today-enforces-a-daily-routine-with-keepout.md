@@ -89,8 +89,11 @@ for sick days and trips while making them visible.
 Evening outing details: dinner is usually eaten outside, so the walk and
 dinner are one item. "Went outside" is 30+ minutes away from home rather than
 entering the park, so restaurant trips count and routes can change. If the
-operator never leaves, the lock holds into the night lock; affordance is the
-only way out (operator choice: strict).
+operator hasn't left by sunset, the Mac locks; leaving after dark still
+completes the item and lifts the lock, so the sunset lock is the pressure to
+go out in daylight, not a point of no return. If the operator never leaves,
+the lock holds into the night lock; affordance is the only way out (operator
+choice: strict).
 
 ## Consequences
 
