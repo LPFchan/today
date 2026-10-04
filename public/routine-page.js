@@ -144,14 +144,20 @@ function render() {
       details.append(status);
     } else {
       const status = node('div', 'routine-item-status');
-      if (item.phase !== 'past') {
-        const phase = node('span', '', t(`routinePhase_${item.phase}`));
-        if (item.kind === 'window' && (item.phase === 'upcoming' || item.phase === 'open')) {
-          phase.append(document.createTextNode(` · ${t('routineLocksAt', { time: clock(item.end) })}`));
-        }
-        status.append(phase);
+      if (item.phase !== 'past' && item.phase !== 'upcoming') {
+        status.append(node('span', '', t(`routinePhase_${item.phase}`)));
       }
-      if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
+      if (item.keepout) {
+        const beforeLock = item.phase === 'upcoming' || item.phase === 'open';
+        if (beforeLock && status.childElementCount) status.append(node('span', '', '·'));
+        status.append(node('span', 'routine-tag', t('routineKeepout')));
+        if (beforeLock) {
+          status.append(
+            node('span', '', '·'),
+            node('span', '', t('routineLockFrom', { time: clock(item.kind === 'window' ? item.end : item.start) })),
+          );
+        }
+      }
       if (status.childElementCount) details.append(status);
     }
     const buttons = node('div', 'routine-actions');
