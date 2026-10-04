@@ -52,9 +52,11 @@ const el = {
 
 const MINUTE = 60_000;
 const BOARD_REFRESH_MS = 60_000;
-// A finished day is re-checked this often, so an auto-routine's next day
-// shows up without a reload.
-const FINISHED_REFRESH_MS = 60_000;
+// An auto-routine writes the next day's plan on the server, so a visible
+// timer re-reads the plan: every minute once the day is finished or empty,
+// otherwise every few minutes.
+const PLAN_CHECK_MS = 60_000;
+const PLAN_REFRESH_MS = 5 * 60_000;
 
 const state = {
   me: null, // { sub, name, email }
@@ -62,6 +64,7 @@ const state = {
   schedule: null, // { text, anchor }
   items: [], // absolute items of my schedule
   board: null, // { people }
+  profileAt: 0, // when /api/me was last requested
   view: location.pathname.startsWith('/everyone') ? 'everyone' : 'mine',
   completed: null,
   pendingStart: null,
@@ -150,6 +153,7 @@ function applyProfile(profile) {
 }
 
 async function loadProfile() {
+  state.profileAt = Date.now();
   applyProfile(await request('GET', '/api/me'));
 }
 
@@ -821,8 +825,12 @@ setInterval(() => {
 }, BOARD_REFRESH_MS);
 setInterval(() => {
   if (document.visibilityState !== 'visible' || state.view !== 'mine' || !state.me) return;
-  if (dayState(state.items, Date.now()).kind === 'finished') loadProfile().catch(() => {});
-}, FINISHED_REFRESH_MS);
+  const now = Date.now();
+  const kind = dayState(state.items, now).kind;
+  if (kind === 'finished' || kind === 'empty' || now - state.profileAt >= PLAN_REFRESH_MS) {
+    loadProfile().catch(() => {});
+  }
+}, PLAN_CHECK_MS);
 
 translatePage();
 renderAlert();
