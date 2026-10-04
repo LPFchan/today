@@ -62,7 +62,8 @@ test('sunset offsets and range separators are unambiguous', () => {
 test('sunset offsets accept six hours and reject larger magnitudes on their source line', () => {
   for (const [token, minutes] of [
     ['sunset-6h', -360], ['sunset+6h', 360], ['sunset-360m', -360], ['sunset+360m', 360],
-  ]) assert.deepEqual(parseRoutine(`${token} outing`)[0].start, { base: 'sunset', minutes });
+  ]) assert.deepEqual(parseRoutine(`${token} outing`, DEFAULT_PLACE, { validate: false })[0].start,
+    { base: 'sunset', minutes });
   for (const token of ['sunset-20h..sunset-19h', 'sunset+10h', 'sunset-6h1m',
     'sunset+361m', '12:00-sunset+6h1m', '12:00..sunset-361m']) {
     for (const validate of [true, false]) {
@@ -222,6 +223,20 @@ sunset..sunset+6h Late`;
         day.items.map(({ start, end, name }) => ({ start, end, name })), `${date}: ${text}`);
     }
   }
+});
+
+test('placement rejects times the ordinary day plan cannot represent at the original source line', () => {
+  assert.deepEqual(code(() => parseRoutine('sunset+6h Late')), ['badTime', 1]);
+  const text = '# note\n\nsunset+6h Late';
+  const items = parseRoutine(text, DEFAULT_PLACE, { validate: false });
+  assert.deepEqual(code(() => placeRoutine(items, '2026-06-27')), ['badTime', 3]);
+  assert.doesNotThrow(() => placeRoutine(items, '2026-12-05'));
+  // The day plan cannot roll past midnight after an early-morning first item.
+  const later = '# note\n04:00-05:00 Early\n# note\nsunset+6h Late';
+  assert.deepEqual(code(() => parseRoutine(later)), ['badTime', 4]);
+  const laterItems = parseRoutine(later, DEFAULT_PLACE, { validate: false });
+  assert.deepEqual(code(() => placeRoutine(laterItems, '2026-06-27')), ['badTime', 4]);
+  assert.doesNotThrow(() => parseRoutine(DEFAULT_ROUTINE));
 });
 
 test('fixed time-only locks ignore completion and stop at their slot end', () => {

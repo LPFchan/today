@@ -8,6 +8,8 @@
 // Blank lines and # notes are ignored. Starts roll past midnight after noon,
 // like schedule.js. Windows open at their start and lock at their deadline.
 
+import { ScheduleError, absoluteItems, parseSchedule } from './schedule.js';
+
 export const MAX_LINES = 60;
 export const MAX_NAME = 80;
 export const DEFAULT_PLACE = { tz: 'Asia/Seoul', lat: 37.5665, lon: 126.978 };
@@ -266,7 +268,29 @@ export function placeRoutine(items, date, place = DEFAULT_PLACE) {
   if (placed.at(-1).end > ends) {
     throw new RoutineError('overlap', linesByItem.get(items.at(-1)) || items.length);
   }
-  return { day: date, anchor, ends, items: placed };
+  const day = { day: date, anchor, ends, items: placed };
+  verifySchedule(day, items);
+  return day;
+}
+
+/** Every placed item must survive the ordinary day plan's clock format. */
+function verifySchedule(day, sourceItems) {
+  let restored;
+  try {
+    restored = absoluteItems(parseSchedule(routineSchedule(day).text), day.anchor);
+  } catch (error) {
+    if (error instanceof ScheduleError) {
+      throw new RoutineError('badTime', linesByItem.get(sourceItems[error.line - 1]) || error.line);
+    }
+    throw error;
+  }
+  day.items.forEach((item, index) => {
+    const actual = restored[index];
+    if (Math.round(actual.start / MINUTE) !== Math.round(item.start / MINUTE)
+        || Math.round(actual.end / MINUTE) !== Math.round(item.end / MINUTE)) {
+      throw new RoutineError('badTime', linesByItem.get(sourceItems[index]) || index + 1);
+    }
+  });
 }
 
 /** Pick the instance between this day's first start and the next day's first start. */
@@ -285,8 +309,7 @@ function clock(minutes) {
 
 /**
  * Ordinary schedule text uses elapsed minutes from the midnight anchor.
- * schedule.js cannot encode every DST-crossing or multi-day elapsed range;
- * round-tripping those can lose a day offset. Seoul routines have no DST.
+ * Placement verifies that this clock format preserves every item's times.
  */
 export function routineSchedule(day) {
   const text = day.items.map((item) => {
