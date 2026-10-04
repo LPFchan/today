@@ -141,11 +141,15 @@ async function request(method, path, body) {
 
 function applyProfile(profile) {
   const switched = state.me && state.me.sub !== profile.me.sub;
+  // A refresh that returns the same plan keeps completion tracking, so an
+  // item ending mid-request still flashes and chimes.
+  const samePlan = state.schedule?.text === profile.schedule?.text
+    && state.schedule?.anchor === profile.schedule?.anchor;
   state.me = profile.me;
   state.visibility = profile.visibility;
   state.schedule = profile.schedule;
   state.items = profile.schedule ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor) : [];
-  state.completed = null;
+  if (!samePlan) state.completed = null;
   if (switched) location.reload();
   renderAccount();
   renderVisibility();
