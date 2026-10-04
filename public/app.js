@@ -65,6 +65,7 @@ const state = {
   items: [], // absolute items of my schedule
   board: null, // { people }
   profileAt: 0, // when /api/me was last requested
+  profileSeq: 0, // bumped by every applied profile
   view: location.pathname.startsWith('/everyone') ? 'everyone' : 'mine',
   completed: null,
   pendingStart: null,
@@ -140,6 +141,7 @@ async function request(method, path, body) {
 }
 
 function applyProfile(profile) {
+  state.profileSeq += 1;
   const switched = state.me && state.me.sub !== profile.me.sub;
   // A refresh that returns the same plan keeps completion tracking, so an
   // item ending mid-request still flashes and chimes.
@@ -158,7 +160,10 @@ function applyProfile(profile) {
 
 async function loadProfile() {
   state.profileAt = Date.now();
-  applyProfile(await request('GET', '/api/me'));
+  const seq = state.profileSeq;
+  const profile = await request('GET', '/api/me');
+  // A save that landed while this read was in flight is newer; keep it.
+  if (state.profileSeq === seq) applyProfile(profile);
 }
 
 async function loadBoard() {
