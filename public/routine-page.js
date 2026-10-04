@@ -57,22 +57,23 @@ function updateHint() {
   else toggleGroup.removeAttribute('aria-expanded');
 }
 
-function pendingDate(day) {
-  const [year, month, date] = day.split('-').map(Number);
-  // A date-only API value is a calendar date, not a UTC midnight timestamp.
-  const start = new Date(year, month - 1, date);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const isTomorrow = start.getFullYear() === tomorrow.getFullYear()
-    && start.getMonth() === tomorrow.getMonth() && start.getDate() === tomorrow.getDate();
-  const formatted = new Intl.DateTimeFormat(lang, { month: 'short', day: 'numeric' }).format(start);
-  return isTomorrow ? t('routineTomorrow', { date: formatted }) : formatted;
+// Dates and times are shown in the routine's zone, the one the server enforces.
+function zoned(options) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: routine?.tz ?? 'Asia/Seoul', ...options });
 }
 
-// Use the browser's local clock, but always render 24-hour ASCII HH:MM.
+function pendingDate(day) {
+  // A YYYY-MM-DD day plus one, compared in the routine's zone.
+  const today = zoned({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(Date.now());
+  const tomorrow = new Date(Date.parse(`${today}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+  const formatted = new Intl.DateTimeFormat(lang, { month: 'short', day: 'numeric', timeZone: 'UTC' })
+    .format(Date.parse(`${day}T00:00:00Z`));
+  return day === tomorrow ? t('routineTomorrow', { date: formatted }) : formatted;
+}
+
+// Always 24-hour ASCII HH:MM.
 function clock(ms) {
-  const date = new Date(ms);
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return zoned({ hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
 }
 
 function node(tag, className, text) {
