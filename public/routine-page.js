@@ -127,10 +127,6 @@ function render() {
     const row = node('li', `routine-item is-${item.phase}${isKeepoutNow ? ' is-keepout-now' : ''}`);
     const times = node('div', 'routine-item-time');
     times.append(node('span', '', `${clock(item.start)}–${clock(item.end)}`));
-    if (new Date(item.start).toDateString() !== new Date(item.end).toDateString()) {
-      times.append(node('span', 'routine-muted', t('nextDay')));
-    }
-    if (item.kind === 'window') times.append(node('span', 'routine-muted', t('routineStartBy', { time: clock(item.end) })));
     const details = node('div', 'routine-item-details');
     details.append(node('span', 'routine-item-name', item.name));
     if (isKeepoutNow) {
@@ -148,7 +144,13 @@ function render() {
       details.append(status);
     } else {
       const status = node('div', 'routine-item-status');
-      if (item.phase !== 'past') status.append(node('span', '', t(`routinePhase_${item.phase}`)));
+      if (item.phase !== 'past') {
+        const phase = node('span', '', t(`routinePhase_${item.phase}`));
+        if (item.kind === 'window' && (item.phase === 'upcoming' || item.phase === 'open')) {
+          phase.append(document.createTextNode(` · ${t('routineLocksAt', { time: clock(item.end) })}`));
+        }
+        status.append(phase);
+      }
       if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
       if (status.childElementCount) details.append(status);
     }
