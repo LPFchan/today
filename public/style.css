@@ -1498,13 +1498,15 @@ textarea[aria-invalid='true'] {
   box-shadow: inset 3px 0 var(--accent);
 }
 
-.routine-page .routine-item.is-keepout-now .routine-item-status {
+.routine-page .routine-keepout-label {
   color: var(--accent);
   font-weight: 600;
 }
 
 .routine-page .routine-item-unlocks {
   margin-top: 6px;
+  color: var(--text-muted);
+  font-size: 13px;
   overflow-wrap: anywhere;
 }
 

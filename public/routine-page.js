@@ -139,12 +139,19 @@ function render() {
         : keepout.until !== null
           ? t('routineUnlockAt', { time: clock(keepout.until) })
           : t('routineWaitingUnlock');
-      details.append(node('p', 'routine-item-unlocks routine-muted', unlocks));
+      const status = node('p', 'routine-item-unlocks');
+      status.append(
+        node('span', 'routine-keepout-label', t('routineKeepoutActive')),
+        document.createTextNode(' · '),
+        node('span', 'routine-muted', unlocks),
+      );
+      details.append(status);
+    } else {
+      const status = node('div', 'routine-item-status');
+      status.append(node('span', '', t(`routinePhase_${item.phase}`)));
+      if (item.keepout) status.append(node('span', 'routine-tag', t('routineKeepout')));
+      details.append(status);
     }
-    const status = node('div', 'routine-item-status');
-    status.append(node('span', '', t(isKeepoutNow ? 'routineKeepoutActive' : `routinePhase_${item.phase}`)));
-    if (item.keepout && !isKeepoutNow) status.append(node('span', 'routine-tag', t('routineKeepout')));
-    details.append(status);
     const buttons = node('div', 'routine-actions');
     if (isKeepoutNow) {
       keepoutActions(buttons, keepout);
