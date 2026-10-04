@@ -288,9 +288,10 @@ async function mutate(method, path, body, inEditor = false) {
   updateControls();
   try {
     accept(await request(method, path, body), body.text);
-    message.textContent = body.text !== undefined
-      ? routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : t('routineSaved')
-      : t(method === 'PUT' ? 'routineTurnedOn' : 'routineUpdated');
+    message.textContent = body.enabled ? t('routineTurnedOn')
+      : body.text !== undefined
+        ? routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : t('routineSaved')
+        : t('routineUpdated');
     retry.hidden = true;
   } catch (error) {
     reportError(error, inEditor);
@@ -355,7 +356,10 @@ document.addEventListener('pointerdown', (event) => {
 });
 
 enabled.addEventListener('change', () => {
-  if (!routine?.enabled && enabled.checked) mutate('PUT', '/api/routine', { enabled: true });
+  // Switching on with an unsaved draft saves it too; once on, edits wait a day.
+  if (!routine?.enabled && enabled.checked) {
+    mutate('PUT', '/api/routine', dirty() ? { enabled: true, text: editor.value } : { enabled: true }, dirty());
+  }
   else updateControls();
 });
 $('routineForm').addEventListener('submit', (event) => {
