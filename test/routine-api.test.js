@@ -413,6 +413,14 @@ test('window start and completion respect the minimum and expose keepout before,
   expectError(await status('done', meal.key), 409, 'not_due');
 });
 
+test('starting a non-keepout window is refused without writing status', async (t) => {
+  const { enable, status, call, DB } = setup(t);
+  assert.equal((await enable('12:00..13:00 Free')).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  expectError(await status('start', '12:00..13:00'), 409, 'not_open');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+});
+
 test('starting a window is blocked by an earlier unfinished lock and allowed after completion', async (t) => {
   const { enable, status, call, at, DB } = setup(t, '12:00');
   await enable();
