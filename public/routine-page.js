@@ -91,7 +91,7 @@ function unlockSentence(needs) {
 }
 
 function actionButton(action, item, canAct, doneAfter = 0) {
-  const button = node('button', action === 'done' ? 'btn primary' : 'btn', t(action === 'start' ? 'start' : 'done'));
+  const button = node('button', 'btn primary', t(action === 'start' ? 'start' : 'done'));
   button.type = 'button';
   button.dataset.allowed = String(canAct);
   button.dataset.action = action;
@@ -144,12 +144,11 @@ function render() {
       details.append(status);
     } else {
       const status = node('div', 'routine-item-status');
-      if (item.phase !== 'past' && item.phase !== 'upcoming') {
+      if (item.phase !== 'past' && item.phase !== 'upcoming' && item.phase !== 'open') {
         status.append(node('span', '', t(`routinePhase_${item.phase}`)));
       }
       if (item.keepout) {
         const beforeLock = item.phase === 'upcoming' || item.phase === 'open';
-        if (beforeLock && status.childElementCount) status.append(node('span', '', '·'));
         status.append(node('span', 'routine-tag', t('routineKeepout')));
         if (beforeLock) {
           status.append(

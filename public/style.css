@@ -1568,16 +1568,8 @@ textarea[aria-invalid='true'] {
 }
 
 .routine-page .btn:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-
-.routine-page .btn:disabled:hover {
-  background: transparent;
-}
-
-.routine-page .btn.primary[data-action='done']:disabled {
   opacity: 1;
+  cursor: not-allowed;
 }
 
 .routine-page .btn.primary:disabled:hover {
