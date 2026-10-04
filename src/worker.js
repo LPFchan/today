@@ -9,12 +9,17 @@
 //   /api/watch  api     — the watch's hub-issued access token, or a browser session
 //   /api/board  api     — the same, for the Mac app, or a browser session
 //   /           oauth   — everything else, browser session only
-//                         (including /download/mac, the newest Mac app)
+//                         (including /api/routine, /api/routine/start,
+//                          /api/routine/done, /api/keepout and /download/mac)
 //
 // Static files in public/ are served before this code runs; see wrangler.jsonc.
 
 import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
+import {
+  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
+  parseRoutine, routineDay, routineSchedule,
+} from '../public/routine.js';
 
 const DAY_MS = 24 * 60 * 60_000;
 // The board lists a schedule until this long after its last item ends.
@@ -73,6 +78,19 @@ async function api(request, env, url) {
       return json(200, await board(env, me));
     case 'GET /api/watch':
       return json(200, await watch(env, me));
+    case 'GET /api/routine':
+      return json(200, await routineProfile(env, me));
+    case 'PUT /api/routine':
+      return saveRoutine(request, env, me);
+    case 'POST /api/routine/start':
+      return routineStatus(request, env, me, 'start');
+    case 'POST /api/routine/done':
+      return routineStatus(request, env, me, 'done');
+    case 'GET /api/keepout': {
+      const now = Date.now();
+      const routine = await currentRoutine(env, me, now);
+      return json(200, { now, keepout: routine.today?.keepout ?? null });
+    }
     default:
       return json(404, { error: 'not_found' });
   }
@@ -104,6 +122,7 @@ async function upsertPerson(env, me, fields = {}) {
 }
 
 async function profile(env, me) {
+  await currentRoutine(env, me);
   let row = await person(env, me.sub);
   if (!row || row.name !== me.name) row = await upsertPerson(env, me);
   return {
@@ -144,6 +163,145 @@ async function saveVisibility(request, env, me) {
   return json(200, await profile(env, me));
 }
 
+/* ---------- opt-in routine ---------- */
+
+async function savedRoutine(env, sub) {
+  return env.DB.prepare('SELECT * FROM routines WHERE sub = ?1').bind(sub).first();
+}
+
+/** Place the current instance; unavailable routines leave the day plan alone. */
+async function currentRoutine(env, me, now = Date.now()) {
+  const row = await savedRoutine(env, me.sub);
+  const result = { row, today: null, materialized: false };
+  if (!row?.enabled) return result;
+  let day;
+  try {
+    const place = { tz: row.tz, lat: row.lat, lon: row.lon };
+    day = routineDay(parseRoutine(row.text, place, { validate: false }), now, place);
+  } catch (error) {
+    if (error instanceof RoutineError) return result;
+    throw error;
+  }
+  if (row.materialized_day !== day.day) {
+    const schedule = routineSchedule(day);
+    await upsertPerson(env, me, {
+      schedule: serializeSchedule(parseSchedule(schedule.text)), anchor: schedule.anchor,
+    });
+    await env.DB.prepare('UPDATE routines SET materialized_day = ?2 WHERE sub = ?1')
+      .bind(me.sub, day.day).run();
+    result.materialized = true;
+  }
+  const { results } = await env.DB.prepare(
+    'SELECT key, started_at, done_at FROM routine_status WHERE sub = ?1 AND day = ?2',
+  ).bind(me.sub, day.day).all();
+  const statuses = Object.fromEntries(results.map((status) => [status.key, {
+    startedAt: status.started_at, doneAt: status.done_at,
+  }]));
+  result.day = day;
+  result.statuses = statuses;
+  result.today = {
+    day: day.day,
+    items: day.items.map((item) => ({
+      ...item, startedAt: statuses[item.key]?.startedAt ?? null,
+      doneAt: statuses[item.key]?.doneAt ?? null,
+      phase: itemPhase(day, item, statuses[item.key], now),
+    })),
+    keepout: keepoutState(day, statuses, now),
+  };
+  return result;
+}
+
+function routineValue(routine) {
+  return {
+    enabled: Boolean(routine.row?.enabled),
+    text: routine.row?.text ?? DEFAULT_ROUTINE,
+    tz: routine.row?.tz ?? DEFAULT_PLACE.tz,
+    today: routine.today,
+  };
+}
+
+async function routineProfile(env, me) {
+  return routineValue(await currentRoutine(env, me));
+}
+
+async function saveRoutine(request, env, me) {
+  const body = await request.json().catch(() => null);
+  if (!body || Array.isArray(body) || typeof body !== 'object'
+      || (!Object.hasOwn(body, 'text') && !Object.hasOwn(body, 'enabled'))
+      || (Object.hasOwn(body, 'text') && typeof body.text !== 'string')
+      || (Object.hasOwn(body, 'enabled') && typeof body.enabled !== 'boolean')) {
+    return json(400, { error: 'bad_request' });
+  }
+  const now = Date.now();
+  const current = await currentRoutine(env, me, now);
+  const text = body.text ?? current.row?.text ?? DEFAULT_ROUTINE;
+  const enabled = body.enabled ?? Boolean(current.row?.enabled);
+  if (current.today?.keepout && (text !== current.row.text || !enabled)) {
+    return json(409, { error: 'keepout' });
+  }
+  if (Object.hasOwn(body, 'text')) {
+    const place = current.row ?? DEFAULT_PLACE;
+    try {
+      parseRoutine(text, place);
+    } catch (error) {
+      if (error instanceof RoutineError) return json(422, { error: error.code, line: error.line });
+      throw error;
+    }
+  }
+  await env.DB.prepare(
+    'INSERT INTO routines (sub, text, enabled, updated_at) VALUES (?1, ?2, ?3, ?4) ' +
+      'ON CONFLICT (sub) DO UPDATE SET text = ?2, enabled = ?3, updated_at = ?4, ' +
+      'materialized_day = CASE WHEN text <> ?2 OR (enabled = 0 AND ?3 = 1) ' +
+        'THEN NULL ELSE materialized_day END',
+  ).bind(me.sub, text, Number(enabled), now).run();
+  return json(200, await routineProfile(env, me));
+}
+
+async function routineStatus(request, env, me, action) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body.day !== 'string' || typeof body.key !== 'string') {
+    return json(400, { error: 'bad_request' });
+  }
+  const now = Date.now();
+  const routine = await currentRoutine(env, me, now);
+  const unavailable = action === 'start' ? 'not_open' : 'not_due';
+  if (!routine.day || body.day !== routine.day.day) return json(409, { error: unavailable });
+  const item = routine.day.items.find((item) => item.key === body.key);
+  if (!item) return json(action === 'start' ? 404 : 409, {
+    error: action === 'start' ? 'not_found' : 'not_due',
+  });
+  const status = routine.statuses[item.key];
+  if (action === 'start') {
+    if (status?.startedAt != null || status?.doneAt != null) return json(409, { error: 'already' });
+    if (item.kind !== 'window' || now < item.start || now >= item.end) {
+      return json(409, { error: 'not_open' });
+    }
+    const written = await env.DB.prepare(
+      'INSERT INTO routine_status (sub, day, key, started_at) VALUES (?1, ?2, ?3, ?4) ' +
+        'ON CONFLICT (sub, day, key) DO UPDATE SET started_at = ?4 ' +
+        'WHERE started_at IS NULL AND done_at IS NULL',
+    ).bind(me.sub, body.day, body.key, now).run();
+    if (!written.meta.changes) return json(409, { error: 'already' });
+  } else {
+    if (!item.keepout || !item.until.length
+        || itemPhase(routine.day, item, status, now) !== 'locked') {
+      return json(409, { error: 'not_due' });
+    }
+    // Check this item's minimum even when another, older lock is displayed.
+    const lock = keepoutState({ ...routine.day, items: [item] }, routine.statuses, now);
+    if (now < lock.doneAfter) return json(409, { error: 'too_soon' });
+    await env.DB.prepare(
+      'INSERT INTO routine_status (sub, day, key, done_at) VALUES (?1, ?2, ?3, ?4) ' +
+        'ON CONFLICT (sub, day, key) DO UPDATE SET done_at = ?4',
+    ).bind(me.sub, body.day, body.key, now).run();
+  }
+  const yesterday = new Date(Date.parse(`${routine.day.day}T00:00:00Z`) - DAY_MS)
+    .toISOString().slice(0, 10);
+  await env.DB.prepare('DELETE FROM routine_status WHERE sub = ?1 AND day < ?2')
+    .bind(me.sub, yesterday).run();
+  return json(200, await routineProfile(env, me));
+}
+
 /** Absolute items of a stored schedule, or [] when it is blank or unreadable. */
 function itemsOf(row) {
   if (!row?.schedule) return [];
@@ -161,22 +319,26 @@ async function board(env, me) {
   )
     .bind(me.sub)
     .all();
-  const people = results.map((row) => {
+  const people = [];
+  for (let row of results) {
+    const routine = await currentRoutine(env, row, now);
+    if (routine.materialized) row = await person(env, row.sub);
     const items = itemsOf(row);
     const current = items.length && items.at(-1).end > now - BOARD_KEEP_MS;
-    return {
+    people.push({
       name: row.name,
       me: row.sub === me.sub,
       visibility: row.visibility,
       items: current ? items : [],
-    };
-  });
+    });
+  }
   people.sort((a, b) => Number(b.me) - Number(a.me));
   return { now, people };
 }
 
 /** The caller's schedule for the watch: [startSec, endSec, name] rows. */
 async function watch(env, me) {
+  await currentRoutine(env, me);
   const row = await person(env, me.sub);
   const items = itemsOf(row).slice(0, WATCH_ITEMS);
   return {
