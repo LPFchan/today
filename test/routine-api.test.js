@@ -124,6 +124,53 @@ test('enabling materializes the routine into the profile, watch and public board
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-05');
 });
 
+test('a visibility write paused across rollover cannot restore a stale schedule', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  const stale = DB.raw.prepare('SELECT schedule, anchor FROM people WHERE sub = ?').get('owner');
+  const prepare = DB.prepare.bind(DB);
+  let pause;
+  let resume;
+  const paused = new Promise((resolve) => { pause = resolve; });
+  const resumed = new Promise((resolve) => { resume = resolve; });
+  t.mock.method(DB, 'prepare', (sql) => {
+    const statement = prepare(sql);
+    if (!sql.startsWith('INSERT INTO people')) return statement;
+    return {
+      ...statement,
+      bind: (...values) => {
+        const bound = statement.bind(...values);
+        return {
+          ...bound,
+          run: async () => {
+            if (values[2] === 'public') {
+              pause();
+              await resumed;
+            }
+            return bound.run();
+          },
+        };
+      },
+    };
+  });
+  at('12:00', '2026-10-06');
+  const visibility = call('PUT', '/api/visibility', { visibility: 'public' });
+  await paused;
+  const expected = expectedSchedule(ROUTINE, '12:00', '2026-10-06');
+  try {
+    assert.deepEqual((await call('GET', '/api/me')).body.schedule, expected);
+    assert.notEqual(stale.anchor, expected.anchor);
+  } finally {
+    resume();
+  }
+  const saved = await visibility;
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.visibility, 'public');
+  assert.deepEqual(saved.body.schedule, expected);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expected);
+  assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+});
+
 test('manual edits survive until the instance changes at its first start', async (t) => {
   const { enable, call, at } = setup(t);
   await enable();

@@ -105,20 +105,18 @@ async function person(env, sub) {
 /** Insert or update the caller's row. The display name follows the hub. */
 async function upsertPerson(env, me, fields = {}) {
   const now = Date.now();
-  const current = await person(env, me.sub);
-  const next = {
-    name: me.name,
-    visibility: fields.visibility ?? current?.visibility ?? 'private',
-    schedule: fields.schedule ?? current?.schedule ?? '',
-    anchor: fields.anchor ?? current?.anchor ?? 0,
-  };
+  const updates = ['updated_at = ?6'];
+  if (fields.schedule == null && fields.anchor == null) updates.push('name = ?2');
+  if (fields.visibility != null) updates.push('visibility = ?3');
+  if (fields.schedule != null) updates.push('schedule = ?4');
+  if (fields.anchor != null) updates.push('anchor = ?5');
   await env.DB.prepare(
     'INSERT INTO people (sub, name, visibility, schedule, anchor, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ' +
-      'ON CONFLICT (sub) DO UPDATE SET name = ?2, visibility = ?3, schedule = ?4, anchor = ?5, updated_at = ?6',
+      `ON CONFLICT (sub) DO UPDATE SET ${updates.join(', ')}`,
   )
-    .bind(me.sub, next.name, next.visibility, next.schedule, next.anchor, now)
+    .bind(me.sub, me.name, fields.visibility ?? 'private', fields.schedule ?? '', fields.anchor ?? 0, now)
     .run();
-  return { sub: me.sub, ...next, updated_at: now };
+  return person(env, me.sub);
 }
 
 async function profile(env, me) {
