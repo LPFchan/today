@@ -184,16 +184,23 @@ async function currentRoutine(env, me, now = Date.now()) {
   if (!row || (!row.enabled && !row.pending_text)) return result;
   let day;
   try {
-    day = routineInstance(row, now);
-    if (row.pending_text !== null && row.pending_from !== null && day.day >= row.pending_from) {
+    let pendingDay = null;
+    if (row.pending_text !== null && row.pending_from !== null) {
+      try {
+        pendingDay = routineInstance({ ...row, text: row.pending_text }, now, null);
+      } catch (error) {
+        if (!(error instanceof RoutineError)) throw error;
+      }
+    }
+    if (pendingDay && pendingDay.day >= row.pending_from) {
       await env.DB.prepare(
         'UPDATE routines SET text = pending_text, pending_text = NULL, pending_from = NULL, ' +
           'materialized_day = NULL WHERE sub = ?1 AND pending_from <= ?2',
-      ).bind(me.sub, day.day).run();
+      ).bind(me.sub, pendingDay.day).run();
       row = await savedRoutine(env, me.sub);
       result.row = row;
-      day = routineInstance(row, now, day.day);
     }
+    day = routineInstance(row, now);
   } catch (error) {
     if (error instanceof RoutineError) return result;
     throw error;
@@ -318,12 +325,12 @@ async function routineStatus(request, env, me, action) {
     ).bind(me.sub, body.day, body.key, now).run();
     if (!written.meta.changes) return json(409, { error: 'already' });
   } else {
+    const lock = routine.today.keepout;
+    if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
     if (!item.keepout || !item.until.length
         || itemPhase(routine.day, item, status, now) !== 'locked') {
       return json(409, { error: 'not_due' });
     }
-    // Check this item's minimum even when another, older lock is displayed.
-    const lock = keepoutState({ ...routine.day, items: [item] }, routine.statuses, now);
     if (now < lock.doneAfter) return json(409, { error: 'too_soon' });
     await env.DB.prepare(
       'INSERT INTO routine_status (sub, day, key, done_at) VALUES (?1, ?2, ?3, ?4) ' +

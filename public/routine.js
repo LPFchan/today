@@ -261,6 +261,9 @@ export function placeRoutine(items, date, place = DEFAULT_PLACE) {
     }
   });
   const ends = resolve(items[0].start, addDate(date, 1), place, linesByItem.get(items[0]) || 1);
+  if (placed.at(-1).end > ends) {
+    throw new RoutineError('overlap', linesByItem.get(items.at(-1)) || items.length);
+  }
   return { day: date, anchor, ends, items: placed };
 }
 

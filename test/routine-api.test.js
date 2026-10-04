@@ -239,25 +239,63 @@ test('overnight edits target the next instance date, not the next calendar date'
   assert.equal(next.today.items.find((item) => item.key === '14:00-02:30').name, 'Next instance');
 });
 
-test('moving the first start later keeps the promoted instance on its next-day date', async (t) => {
+test('moving the first start later waits for the pending routine to begin its next instance', async (t) => {
   const { enable, call, at } = setup(t, '12:00');
   const original = '12:00-12:30 First ! until done\n14:00-15:00 Second ! until done';
   const revised = original.replace('12:00-12:30', '13:00-13:30');
   await enable(original);
   assert.equal((await call('PUT', '/api/routine', { text: revised })).body.pendingFrom, '2026-10-06');
   at('12:00', '2026-10-06');
+  const waiting = (await call('GET', '/api/routine')).body;
+  assert.equal(waiting.pendingFrom, '2026-10-06');
+  assert.equal(waiting.today.items[0].key, '12:00-12:30');
+  at('13:00', '2026-10-06');
   for (let read = 0; read < 2; read++) {
     const next = (await call('GET', '/api/routine')).body;
     assert.equal(next.today.day, '2026-10-06');
     assert.equal(next.pendingFrom, null);
     assert.equal(next.today.items[0].start, instant('13:00', '2026-10-06'));
-    assert.equal(next.today.items[0].phase, 'upcoming');
+    assert.equal(next.today.items[0].phase, 'locked');
   }
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, {
     text: revised.replaceAll(' ! until done', ''), anchor: instant('00:00', '2026-10-06'),
   });
   at('13:00', '2026-10-06');
   assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '13:00-13:30');
+});
+
+test('an earlier pending first start promotes without waiting for the old first start', async (t) => {
+  const { enable, call, at, DB } = setup(t, '13:00');
+  const original = '13:00-13:30 First ! until done\n14:00-15:00 Second ! until done';
+  const revised = original.replace('13:00-13:30', '12:00-12:30');
+  await enable(original);
+  assert.equal((await call('PUT', '/api/routine', { text: revised })).body.pendingFrom, '2026-10-06');
+  at('11:59', '2026-10-06');
+  assert.equal((await call('GET', '/api/routine')).body.pendingFrom, '2026-10-06');
+  at('12:00', '2026-10-06');
+  const next = (await call('GET', '/api/routine')).body;
+  assert.equal(next.pendingFrom, null);
+  assert.equal(next.today.day, '2026-10-06');
+  assert.equal(next.today.keepout.key, '12:00-12:30');
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(revised, '12:00', '2026-10-06'));
+  assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, revised);
+});
+
+test('unplaceable pending text leaves the active routine and pending edit intact', async (t) => {
+  const { enable, call, at, DB } = setup(t);
+  await enable();
+  const pending = '12:00-13:00 First\n03:00-14:00 Sleep';
+  DB.raw.prepare('UPDATE routines SET pending_text = ?, pending_from = ? WHERE sub = ?')
+    .run(pending, '2026-10-06', 'owner');
+  at('12:00', '2026-10-06');
+  const result = await call('GET', '/api/routine');
+  assert.equal(result.status, 200);
+  assert.equal(result.body.text, pending);
+  assert.equal(result.body.pendingFrom, '2026-10-06');
+  assert.equal(result.body.today.day, '2026-10-06');
+  assert.equal(result.body.today.keepout.key, '12:00-12:20');
+  assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, ROUTINE);
+  assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(ROUTINE, '12:00', '2026-10-06'));
 });
 
 for (const route of ['/api/me', '/api/watch', '/api/routine', '/api/keepout', '/api/board']) {
@@ -358,17 +396,20 @@ test('starting a window is blocked by an earlier unfinished lock and allowed aft
   expectError(await status('start', '12:30..14:00'), 409, 'already');
 });
 
-test('unstarted windows lock at the deadline, and each overlapping lock uses its own minimum', async (t) => {
-  const { enable, status, call, at } = setup(t, '12:00');
+test('later locks cannot be completed before the current keepout is done', async (t) => {
+  const { enable, status, call, at, DB } = setup(t, '12:00');
   await enable();
   at('14:00');
   assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
   expectError(await status('start', '12:30..14:00'), 409, 'locked');
-  expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
+  expectError(await status('done', '12:30..14:00'), 409, 'locked');
   at('14:20');
-  assert.equal((await status('done', '12:30..14:00')).status, 200);
+  expectError(await status('done', '12:30..14:00'), 409, 'locked');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
   assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
   assert.equal((await status('done', '12:00-12:20')).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:30..14:00');
+  assert.equal((await status('done', '12:30..14:00')).status, 200);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
 });
 
@@ -381,11 +422,14 @@ test('start and done reject the wrong day, unopened and unknown items, free time
   expectError(await status('start', '12:30..14:00', '2026-10-04'), 409, 'not_open');
   expectError(await status('done', '12:00-12:20', '2026-10-04'), 409, 'not_due');
   expectError(await status('done', 'missing'), 409, 'not_due');
-  expectError(await status('done', '14:00-02:30'), 409, 'not_due');
+  expectError(await status('done', '14:00-02:30'), 409, 'locked');
   at('03:00', '2026-10-06');
-  expectError(await status('done', '02:30-12:00'), 409, 'not_due');
+  expectError(await status('done', '02:30-12:00'), 409, 'locked');
   expectError(await status('start', '14:00-02:30'), 409, 'locked');
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+  await status('done', '12:00-12:20');
+  await status('done', '12:30..14:00');
+  expectError(await status('done', '02:30-12:00'), 409, 'not_due');
 });
 
 test('status writes prune only this owner, keeping yesterday relative to the instance day', async (t) => {
@@ -425,7 +469,7 @@ sunset-02:00 Free
   assert.ok(earlier.every((item) => !item.keepout && !['locked', 'missed'].includes(item.phase)));
   for (const key of ['12:30..14:00', 'sunset-1h..sunset']) {
     assert.equal(earlier.find((item) => item.key === key).keepout, false);
-    expectError(await status('done', key, '2026-10-04'), 409, 'not_due');
+    expectError(await status('done', key, '2026-10-04'), 409, 'locked');
   }
   const hygiene = enabled.body.today.items.find((item) => item.key === '02:00-02:30');
   assert.equal(hygiene.keepout, true);
@@ -450,8 +494,9 @@ test('enabling before the day preserves overdue locks and minimum completion tim
   const current = (await call('GET', '/api/routine')).body.today;
   assert.equal(current.items.find((item) => item.key === '12:30..14:00').phase, 'locked');
   assert.equal(current.keepout.key, '12:00-12:20');
-  expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
+  expectError(await status('done', '12:30..14:00'), 409, 'locked');
   assert.equal((await status('done', '12:00-12:20')).status, 200);
+  expectError(await status('done', '12:30..14:00'), 409, 'too_soon');
   at('14:20');
   assert.equal((await status('done', '12:30..14:00')).status, 200);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);

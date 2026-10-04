@@ -123,6 +123,17 @@ test('annual validation catches a summer-only overlap and DST-zone overlap', () 
   assert.deepEqual(code(() => parseRoutine('sunset-1h..sunset outing\n18:00-20:00 work', ny)), ['overlap', 2]);
 });
 
+test('the last item cannot extend into the next instance, with the source line preserved', () => {
+  const text = '# note\n12:00-13:00 First\n03:00-14:00 Sleep';
+  assert.deepEqual(code(() => parseRoutine(text)), ['overlap', 3]);
+  const items = parseRoutine(text, DEFAULT_PLACE, { validate: false });
+  assert.deepEqual(code(() => placeRoutine(items, '2026-10-05')), ['overlap', 3]);
+  assert.deepEqual(code(() => parseRoutine('12:00-13:00 First\n03:00-14:00 Sleep')), ['overlap', 2]);
+  const exact = makeDay('12:00-13:00 First\n03:00-12:00 Sleep');
+  assert.equal(exact.items.at(-1).end, exact.ends);
+  assert.doesNotThrow(() => parseRoutine(DEFAULT_ROUTINE));
+});
+
 test('NOAA sunset is within three minutes of the Seoul reference values', () => {
   assert.ok(Math.abs(sunsetMinutes('2026-12-05', DEFAULT_PLACE) - (17 * 60 + 13)) <= 3);
   assert.ok(Math.abs(sunsetMinutes('2026-06-27', DEFAULT_PLACE) - (19 * 60 + 57)) <= 3);
