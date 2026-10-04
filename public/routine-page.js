@@ -82,8 +82,16 @@ function node(tag, className, text) {
   return el;
 }
 
+function unlockSentence(needs) {
+  const phrases = needs.map((need, index) => t(`routineUnlockNeed_${need}_${index === needs.length - 1 ? 'last' : 'then'}`));
+  const instructions = lang === 'ko' || phrases.length < 2
+    ? phrases.join(' ')
+    : `${phrases.slice(0, -1).join(', ')} and ${phrases.at(-1)}`;
+  return t('routineUnlockSentence', { instructions });
+}
+
 function actionButton(action, item, canAct, doneAfter = 0) {
-  const button = node('button', 'btn', t(action === 'start' ? 'start' : 'done'));
+  const button = node('button', action === 'done' ? 'btn primary' : 'btn', t(action === 'start' ? 'start' : 'done'));
   button.type = 'button';
   button.dataset.allowed = String(canAct);
   button.dataset.action = action;
@@ -122,12 +130,12 @@ function render() {
     if (new Date(item.start).toDateString() !== new Date(item.end).toDateString()) {
       times.append(node('span', 'routine-muted', t('nextDay')));
     }
-    if (item.kind === 'window') times.append(node('span', 'routine-muted', t('routineWindow')));
+    if (item.kind === 'window') times.append(node('span', 'routine-muted', t('routineStartBy', { time: clock(item.end) })));
     const details = node('div', 'routine-item-details');
     details.append(node('span', 'routine-item-name', item.name));
     if (isKeepoutNow) {
       const unlocks = keepout.needs.length
-        ? t('routineUnlocks', { needs: keepout.needs.map((need) => t(`routineNeed_${need}`)).join(', ') })
+        ? unlockSentence(keepout.needs)
         : keepout.until !== null
           ? t('routineUnlockAt', { time: clock(keepout.until) })
           : t('routineWaitingUnlock');

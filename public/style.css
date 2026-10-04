@@ -1574,6 +1574,10 @@ textarea[aria-invalid='true'] {
   background: transparent;
 }
 
+.routine-page .btn.primary[data-action='done']:disabled {
+  opacity: 1;
+}
+
 .routine-page .btn.primary:disabled:hover {
   background: var(--accent-solid);
 }
