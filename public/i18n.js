@@ -319,7 +319,7 @@ const STRINGS = {
     routineUnlockNeed_away_then: 'heading out for a while',
     routineUnlockNeed_away_last: 'heading out for a while',
     routineLockFrom: 'from {time}',
-    routineUnlockAt: 'Unlocks at {time} (your device’s time).',
+    routineUnlockAt: 'Unlocks at {time}.',
     routineWaitingUnlock: 'Waiting for the unlock conditions.',
     routinePhase_locked: 'Locked',
     routinePhase_missed: 'Missed',
