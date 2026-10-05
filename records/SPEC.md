@@ -50,6 +50,11 @@ flash-and-chime when an item ends.
 - Auto-routine is per person and off by default. People without it see no
   difference anywhere. Keepout state and progress are private to their
   owner; the board shows only the plan.
+- `GET /api/keepout` defaults to JSON (`now`, `day`, `keepout`). With
+  `Accept: text/plain`, it returns 200 with `text/plain; charset=utf-8`:
+  an empty body when free, or one newline-terminated `today keepout:` line
+  naming the item and the actions that unlock it, or its unlock time as
+  HH:MM in the routine's timezone. Errors retain their JSON shape and status.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
   tokens for resource `https://today.lost.plus/mcp`, scope `today`; the
   gateway accepts those only on `/api/watch` and `/api/board`.
