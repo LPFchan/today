@@ -25,7 +25,7 @@ Do not put raw brainstorms or untriaged intake here.
   on willpower during hyperfocus.
 - Preconditions: findmy-mcp running on dumpling (live since 2026-10-05).
 - Earliest likely start: now.
-- Related ids: DEC-20261005-001
+- Related ids: DEC-20261005-001, DEC-20261005-003
 
 Who owns what:
 
@@ -51,8 +51,7 @@ the board, the watch or the Mac app.
     `today` token mark its owner's routine items started or done (today the
     Mac app is read-only).
   - Scope: full-screen overlay over every display while keepout is due,
-    showing the item and what unlocks it, with a "done" button for
-    honor-system items and a "starting now" button for window items.
+    showing the item and what unlocks it, with a "done" button.
     Until phase 6 lands, wake-up, meals and the outing can also complete
     with the same "done" button, so no lock can become impossible to lift
     before both proofs and bypasses exist.
@@ -60,10 +59,14 @@ the board, the watch or the Mac app.
 - Phase 3 — agent keepout:
   - Why now: closes the "code over SSH from another machine" gap.
   - Dependencies: phases 1–2 (the overlay's "done" button is how a keepout item ends); a token the check can use to read keepout state from any machine; operator approval of the global agent-instructions edit.
-  - Scope: one `today-keepout` check in setup; Claude Code `UserPromptSubmit`,
-    Codex `hooks.json` `UserPromptSubmit`, Gemini `BeforeAgent`, OpenCode
-    tool-call blocking, a zsh launch wrapper for harnesses without hooks.
-    Hermes and long-running autonomous jobs are exempt.
+  - Scope: no new CLI. Each harness hook runs a one-line `curl` to
+    `today.lost.plus/api/keepout`, which answers plain text (empty when free,
+    the lock line otherwise); a lock drops the prompt before the model sees
+    it, and an unreachable today lets the prompt through. Hooks: Claude Code
+    `UserPromptSubmit`, Codex `hooks.json` `UserPromptSubmit`, Gemini
+    `BeforeAgent`, OpenCode tool-call blocking; the global agent instructions
+    cover harnesses without hooks. Hermes and long-running autonomous jobs
+    are exempt.
   - Related ids: DEC-20261005-001
 
 ### Mid Term

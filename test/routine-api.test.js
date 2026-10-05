@@ -652,7 +652,6 @@ test('window start and completion respect the minimum and expose keepout before,
   // Fixed proof items stay due after their slot ends.
   assert.equal((await status('done', '12:00-12:20')).status, 200);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
-  expectError(await status('done', '12:30..14:00'), 409, 'not_due');
   const started = await status('start', '12:30..14:00');
   assert.equal(started.status, 200);
   const meal = started.body.today.items.find((item) => item.key === '12:30..14:00');
@@ -674,6 +673,21 @@ test('window start and completion respect the minimum and expose keepout before,
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
   expectError(await status('start', meal.key), 409, 'already');
   expectError(await status('done', meal.key), 409, 'not_due');
+});
+
+test('an open window finished before its deadline never locks', async (t) => {
+  const { enable, status, call, at } = setup(t, '12:00');
+  await enable();
+  assert.equal((await status('done', '12:00-12:20')).status, 200);
+  at('12:10');
+  expectError(await status('done', '12:30..14:00'), 409, 'not_due');
+  at('13:05');
+  const done = await status('done', '12:30..14:00');
+  assert.equal(done.status, 200);
+  assert.equal(done.body.today.items.find((item) => item.key === '12:30..14:00').phase, 'done');
+  at('14:30');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  expectError(await status('done', '12:30..14:00'), 409, 'not_due');
 });
 
 test('starting a non-keepout window is refused without writing status', async (t) => {

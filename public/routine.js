@@ -1,7 +1,7 @@
 // A recurring routine, shared by the browser and the Worker.
 //
 //   12:00-12:20 Hygiene ! until done
-//   12:30..14:00 Meal ! until photo; min 20m
+//   12:30..14:00 Meal ! until photo
 //   sunset-1h..sunset Outing ! until away 30m, photo
 //   03:00-12:00 Sleep !
 //
@@ -14,7 +14,7 @@ export const MAX_LINES = 60;
 export const MAX_NAME = 80;
 export const DEFAULT_PLACE = { tz: 'Asia/Seoul', lat: 37.5665, lon: 126.978 };
 export const DEFAULT_ROUTINE = `12:00-12:20 wake up, wash face, brush teeth ! until wake, done
-12:30..14:00 lunch ! until photo; min 20m
+12:30..14:00 lunch ! until photo
 14:00-sunset-1h free time
 sunset-1h..sunset evening outing and dinner ! until away 30m, photo
 sunset-02:30 free time
@@ -325,7 +325,9 @@ function progress(day, item, status, now) {
   const since = item.kind === 'window' ? Math.min(startedAt ?? item.end, item.end) : item.start;
   const doneAfter = since + item.minMinutes * MINUTE;
   const doneAt = status?.doneAt;
-  const done = Number.isFinite(doneAt) && doneAt >= doneAfter && doneAt < day.ends && doneAt <= now;
+  // A window finished before it locked never locks at all.
+  const early = item.kind === 'window' && doneAt >= item.start && doneAt < since;
+  const done = Number.isFinite(doneAt) && (early || doneAt >= doneAfter) && doneAt < day.ends && doneAt <= now;
   return { since, doneAfter, done, startedAt };
 }
 

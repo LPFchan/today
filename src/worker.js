@@ -344,11 +344,13 @@ async function routineStatus(request, env, me, action) {
   } else {
     const lock = routine.today.keepout;
     if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
-    if (!item.keepout || !item.until.length
-        || itemPhase(routine.day, item, status, now) !== 'locked') {
+    // A keepout window can also be finished while open, before it locks.
+    const phase = itemPhase(routine.day, item, status, now);
+    const early = phase === 'open' && item.kind === 'window';
+    if (!item.keepout || !item.until.length || (phase !== 'locked' && !early)) {
       return json(409, { error: 'not_due' });
     }
-    if (now < lock.doneAfter) return json(409, { error: 'too_soon' });
+    if (!early && now < lock.doneAfter) return json(409, { error: 'too_soon' });
     await env.DB.prepare(
       'INSERT INTO routine_status (sub, day, key, done_at) VALUES (?1, ?2, ?3, ?4) ' +
         'ON CONFLICT (sub, day, key) DO UPDATE SET done_at = ?4',
