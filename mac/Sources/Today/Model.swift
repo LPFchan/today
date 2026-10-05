@@ -42,6 +42,8 @@ final class Model {
     @ObservationIgnored private var signIn: Task<Void, Never>?
     @ObservationIgnored private var keepoutTask: Task<Void, Never>?
     @ObservationIgnored private var lastKeepoutTry = Date.distantPast
+    @ObservationIgnored private var expiredKeepoutUntil: Date?
+    @ObservationIgnored private var expiredKeepoutFailureSince: Date?
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var savedKeepout: KeepoutReply?
     @ObservationIgnored private var lastLoginTry = Date.distantPast
@@ -89,15 +91,11 @@ final class Model {
             enforcing = UserDefaults.standard.bool(forKey: "enforcing")
             // Restore the cover before polling, including after an offline relaunch.
             if let reply = KeepoutStore.load(), let lock = reply.keepout {
-                if lock.until.map({ $0 > now }) ?? true {
-                    savedKeepout = reply
-                    keepout = lock
-                    keepoutDay = reply.day
-                    enforcing = true
-                    UserDefaults.standard.set(true, forKey: "enforcing")
-                } else {
-                    KeepoutStore.clear()
-                }
+                savedKeepout = reply
+                keepout = lock
+                keepoutDay = reply.day
+                enforcing = true
+                UserDefaults.standard.set(true, forKey: "enforcing")
             }
             LoginItem.migrate()
             syncLoginItem()
@@ -131,10 +129,23 @@ final class Model {
 
     private func tick() {
         now = Date()
-        if let until = keepout?.until, until <= now { clearKeepout() }
-        if preview { return }
+        if preview {
+            if let until = keepout?.until, until <= now { clearKeepout() }
+            return
+        }
+        if let until = keepout?.until, until <= now {
+            // Hold the cover while checking for a successor, even after relaunch.
+            if expiredKeepoutUntil != until {
+                expiredKeepoutUntil = until
+                lastKeepoutTry = .distantPast
+            }
+            if let since = expiredKeepoutFailureSince, now.timeIntervalSince(since) >= 60 {
+                clearKeepout()
+            }
+        }
         if now.timeIntervalSince(lastLoginTry) >= 15 { syncLoginItem() }
-        if now.timeIntervalSince(lastKeepoutTry) >= 15 { refreshKeepout() }
+        let keepoutInterval: TimeInterval = expiredKeepoutUntil == nil ? 15 : 3
+        if now.timeIntervalSince(lastKeepoutTry) >= keepoutInterval { refreshKeepout() }
         // Plans change rarely; the timers run locally in between.
         if session == .signedIn, now.timeIntervalSince(lastTry) >= 60 { refresh() }
         // You are always on a loaded board, so an empty one means none yet.
@@ -192,11 +203,16 @@ final class Model {
     }
 
     private func fetchKeepout(generation current: Int) async {
-        lastKeepoutTry = Date()
+        let attempted = Date()
+        lastKeepoutTry = attempted
         do {
             let reply = try await Account.keepout()
             guard current == generation else { return }
             finishProblem = nil
+            expiredKeepoutFailureSince = nil
+            if keepout?.key != reply.keepout?.key || keepout?.until != reply.keepout?.until {
+                expiredKeepoutUntil = nil
+            }
             keepout = reply.keepout
             keepoutDay = reply.day
             if keepout != nil, !enforcing {
@@ -204,16 +220,21 @@ final class Model {
                 UserDefaults.standard.set(true, forKey: "enforcing")
                 syncLoginItem()
             }
-            if let until = keepout?.until, until <= Date() {
-                clearKeepout()
-            } else if savedKeepout != reply || reply.keepout == nil {
-                try KeepoutStore.save(reply)
-                savedKeepout = reply
+            if savedKeepout != reply || reply.keepout == nil {
+                do {
+                    try KeepoutStore.save(reply)
+                    savedKeepout = reply
+                } catch {
+                    finishProblem = error.localizedDescription
+                }
             }
         } catch {
             guard current == generation else { return }
-            // A failed request never drops a lock, including an expired token.
             finishProblem = error.localizedDescription
+            if let until = keepout?.until, until <= Date(), expiredKeepoutFailureSince == nil {
+                // Count failed attempts after expiry; old cached locks get a fresh minute.
+                expiredKeepoutFailureSince = max(until, attempted)
+            }
         }
     }
 
@@ -249,6 +270,8 @@ final class Model {
 
     private func clearKeepout() {
         keepout = nil
+        expiredKeepoutUntil = nil
+        expiredKeepoutFailureSince = nil
         savedKeepout = nil
         keepoutDay = nil
         finishProblem = nil
