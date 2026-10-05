@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_PLACE, DEFAULT_ROUTINE, MAX_LINES, MAX_NAME, RoutineError,
   parseRoutine, sunsetMinutes, zonedMidnight, zonedDate, placeRoutine,
-  routineDay, routineSchedule, keepoutState, itemPhase,
+  routineDay, routineSchedule, keepoutState, itemPhase, remainingNeeds,
 } from '../public/routine.js';
 import { parseSchedule, absoluteItems, serializeSchedule } from '../public/schedule.js';
 
@@ -20,6 +20,13 @@ const code = (fn) => {
 const ny = { tz: 'America/New_York', lat: 40.7128, lon: -74.006 };
 const makeDay = (text, date = '2026-10-05', place = DEFAULT_PLACE) => placeRoutine(parseRoutine(text, place), date, place);
 const at = (day, hours, minutes = 0) => day.anchor + (hours * 60 + minutes) * MINUTE;
+
+test('unlock requirements exclude accepted proofs and preserve Done', () => {
+  assert.deepEqual(remainingNeeds({ needs: ['away', 'photo'], have: ['away'] }), ['photo']);
+  assert.deepEqual(remainingNeeds({ needs: ['wake', 'done'], have: ['wake', 'done'] }), ['done']);
+  assert.deepEqual(remainingNeeds({ needs: ['wake'] }), ['wake']);
+  assert.deepEqual(remainingNeeds({ needs: [], have: [] }), []);
+});
 
 test('routine forms retain tokens, conditions and names', () => {
   const items = parseRoutine(`# comment
@@ -246,7 +253,7 @@ test('fixed time-only locks ignore completion and stop at their slot end', () =>
   const state = keepoutState(day, { [item.key]: { doneAt: at(day, 12) } }, at(day, 12, 30));
   assert.deepEqual(state, {
     key: item.key, name: 'sleep', kind: 'fixed', since: at(day, 12), until: at(day, 13),
-    needs: [], canStart: false, canDone: false, doneAfter: at(day, 12),
+    needs: [], have: [], canStart: false, canDone: false, doneAfter: at(day, 12),
   });
   assert.equal(keepoutState(day, {}, at(day, 13)), null);
   assert.equal(itemPhase(day, item, {}, at(day, 12)), 'locked');

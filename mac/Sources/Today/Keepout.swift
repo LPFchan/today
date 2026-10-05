@@ -7,12 +7,15 @@ struct Keepout: Decodable, Equatable {
     let since: Date
     let until: Date?
     let needs: [String]
+    let have: [String]
     let canStart: Bool
     let canDone: Bool
     let doneAfter: Date
 
+    var remainingNeeds: [String] { needs.filter { $0 == "done" || !have.contains($0) } }
+
     private enum CodingKeys: String, CodingKey {
-        case key, name, kind, since, until, needs, canStart, canDone, doneAfter
+        case key, name, kind, since, until, needs, have, canStart, canDone, doneAfter
     }
 
     init(from decoder: Decoder) throws {
@@ -23,6 +26,7 @@ struct Keepout: Decodable, Equatable {
         since = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .since) / 1000)
         until = try c.decodeIfPresent(Double.self, forKey: .until).map { Date(timeIntervalSince1970: $0 / 1000) }
         needs = try c.decode([String].self, forKey: .needs)
+        have = try c.decodeIfPresent([String].self, forKey: .have) ?? []
         canStart = try c.decode(Bool.self, forKey: .canStart)
         canDone = try c.decode(Bool.self, forKey: .canDone)
         doneAfter = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .doneAfter) / 1000)
@@ -38,6 +42,7 @@ extension Keepout: Encodable {
         try c.encode(since.timeIntervalSince1970 * 1000, forKey: .since)
         try c.encodeIfPresent(until.map { $0.timeIntervalSince1970 * 1000 }, forKey: .until)
         try c.encode(needs, forKey: .needs)
+        try c.encode(have, forKey: .have)
         try c.encode(canStart, forKey: .canStart)
         try c.encode(canDone, forKey: .canDone)
         try c.encode(doneAfter.timeIntervalSince1970 * 1000, forKey: .doneAfter)

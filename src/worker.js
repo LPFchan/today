@@ -18,7 +18,7 @@ import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
   DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
-  parseRoutine, placeRoutine, routineDay, routineSchedule, zonedDate,
+  parseRoutine, placeRoutine, progress, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -89,6 +89,8 @@ async function api(request, env, url) {
       return routineStatus(request, env, me, 'start');
     case 'POST /api/routine/done':
       return routineStatus(request, env, me, 'done');
+    case 'POST /api/routine/proof':
+      return routineProof(request, env, me);
     case 'GET /api/keepout': {
       const now = Date.now();
       const routine = await currentRoutine(env, me, now);
@@ -99,8 +101,16 @@ async function api(request, env, url) {
           headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
         });
       }
-      // `day` is what start and done expect alongside the item key.
-      return json(200, { now, day: routine.today?.day ?? null, keepout: routine.today?.keepout ?? null });
+      const result = { now, day: routine.today?.day ?? null, keepout: routine.today?.keepout ?? null };
+      // Proof collectors need an open window before it becomes a lock.
+      const proof = url.searchParams.get('proof');
+      if (proof !== null) {
+        if (!['wake', 'photo', 'away'].includes(proof)) return json(400, { error: 'bad_request' });
+        const item = proofItem(routine, proof, now);
+        result.item = item && !Object.hasOwn(progress(routine.day, item, routine.statuses[item.key], now).proofs, proof)
+          ? { key: item.key, start: item.start, end: item.end, awayMinutes: item.awayMinutes } : null;
+      }
+      return json(200, result);
     }
     default:
       return json(404, { error: 'not_found' });
@@ -248,10 +258,10 @@ async function currentRoutine(env, me, now = Date.now()) {
     }
   }
   const { results } = await env.DB.prepare(
-    'SELECT key, started_at, done_at FROM routine_status WHERE sub = ?1 AND day = ?2',
+    'SELECT key, started_at, done_at, proofs FROM routine_status WHERE sub = ?1 AND day = ?2',
   ).bind(me.sub, day.day).all();
   const statuses = Object.fromEntries(results.map((status) => [status.key, {
-    startedAt: status.started_at, doneAt: status.done_at,
+    startedAt: status.started_at, doneAt: status.done_at, proofs: JSON.parse(status.proofs),
   }]));
   result.day = day;
   result.statuses = statuses;
@@ -260,6 +270,7 @@ async function currentRoutine(env, me, now = Date.now()) {
     items: day.items.map((item) => ({
       ...item, startedAt: statuses[item.key]?.startedAt ?? null,
       doneAt: statuses[item.key]?.doneAt ?? null,
+      proofs: progress(day, item, statuses[item.key], now).proofs,
       phase: itemPhase(day, item, statuses[item.key], now),
     })),
     keepout: keepoutState(day, statuses, now),
@@ -386,7 +397,8 @@ async function routineStatus(request, env, me, action) {
   if (action === 'start') {
     const lock = routine.today.keepout;
     if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
-    if (status?.startedAt != null || status?.doneAt != null) return json(409, { error: 'already' });
+    if (status?.startedAt != null || status?.doneAt != null
+        || progress(routine.day, item, status, now).done) return json(409, { error: 'already' });
     if (!item.keepout || item.kind !== 'window' || now < item.start || now >= item.end) {
       return json(409, { error: 'not_open' });
     }
@@ -412,6 +424,63 @@ async function routineStatus(request, env, me, action) {
     ).bind(me.sub, body.day, body.key, now).run();
   }
   return json(200, await routineProfile(env, me));
+}
+
+/** Select the current proof-bearing item without skipping an earlier lock. */
+function proofItem(routine, proof, now) {
+  if (!routine.statuses) return null;
+  const lock = routine.today.keepout;
+  if (lock) return routine.day.items.find((item) => item.key === lock.key && item.until.includes(proof)) ?? null;
+  return routine.day.items.find((item) => item.keepout && item.kind === 'window'
+    && item.until.includes(proof)
+    && itemPhase(routine.day, item, routine.statuses[item.key], now) === 'open') ?? null;
+}
+
+/** Record a caller-verified proof; Done remains the temporary override. */
+async function routineProof(request, env, me) {
+  const body = await request.json().catch(() => null);
+  const explicit = body && (Object.hasOwn(body, 'day') || Object.hasOwn(body, 'key'));
+  if (!body || !['wake', 'photo', 'away'].includes(body.proof)
+      || (Object.hasOwn(body, 'note') && (typeof body.note !== 'string' || [...body.note].length > 200))
+      || (explicit && (typeof body.day !== 'string' || typeof body.key !== 'string'))) {
+    return json(400, { error: 'bad_request' });
+  }
+  const now = Date.now();
+  const routine = await currentRoutine(env, me, now);
+  if (!routine.day || !routine.statuses || (explicit && body.day !== routine.day.day)) {
+    return json(409, { error: explicit ? 'not_due' : 'not_needed' });
+  }
+  const lock = routine.today.keepout;
+  const item = explicit ? routine.day.items.find((item) => item.key === body.key)
+    : proofItem(routine, body.proof, now)
+      ?? routine.day.items.find((item) => item.keepout && item.kind === 'window'
+        && item.until.includes(body.proof)
+        && itemPhase(routine.day, item, routine.statuses[item.key], now) === 'open');
+  if (!item) return json(409, { error: explicit ? 'not_due' : 'not_needed' });
+  if (!item.keepout || !item.until.includes(body.proof)) return json(409, { error: 'not_needed' });
+  const status = routine.statuses[item.key];
+  const p = progress(routine.day, item, status, now);
+  const response = async () => {
+    const updated = await routineProfile(env, me);
+    return json(200, { ...updated, item: updated.today.items.find((entry) => entry.key === item.key),
+      keepout: updated.today.keepout });
+  };
+  // Retrying an accepted proof preserves its first timestamp and note, even after completion.
+  if (Object.hasOwn(p.proofs, body.proof)) return response();
+  if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
+  const phase = itemPhase(routine.day, item, status, now);
+  const early = phase === 'open' && item.kind === 'window';
+  if (phase !== 'locked' && !early) return json(409, { error: 'not_due' });
+  if (!early && now < p.doneAfter) return json(409, { error: 'too_soon' });
+  // Merge in SQL so simultaneous different proofs cannot overwrite each other.
+  // The WHERE also makes retries preserve the original proof.
+  await env.DB.prepare(
+    'INSERT INTO routine_status (sub, day, key, proofs) VALUES (?1, ?2, ?3, json_object(?4, json(?5))) ' +
+      'ON CONFLICT (sub, day, key) DO UPDATE SET proofs = json_set(proofs, ?6, json(?5)) ' +
+      'WHERE json_extract(proofs, ?6) IS NULL',
+  ).bind(me.sub, routine.day.day, item.key, body.proof,
+    JSON.stringify({ at: now, note: body.note ?? '' }), `$.${body.proof}`).run();
+  return response();
 }
 
 /** Absolute items of a stored schedule, or [] when it is blank or unreadable. */
@@ -480,7 +549,7 @@ function keepoutText(routine) {
   const keepout = routine.today?.keepout;
   if (!keepout) return '';
   const name = keepout.name.replace(/\s+/g, ' ').trim();
-  // Temporary: Done is the only proof that works until proofs land.
+  // Done remains the temporary override until phase 6.
   if (keepout.needs.length) return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
   if (!keepout.until) return `today keepout: ${name}.\n`;
   const time = new Intl.DateTimeFormat('en-CA', {

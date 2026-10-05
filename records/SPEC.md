@@ -4,7 +4,7 @@
 - Canonical repo: https://github.com/LPFchan/today
 - Project id: today
 - Operator: LPFchan (yeowool)
-- Last updated: 2026-10-05
+- Last updated: 2026-10-06
 - Related decisions: DEC-20260923-001, DEC-20260923-003, DEC-20261005-001, DEC-20261005-002
 
 ## Thesis
@@ -57,6 +57,19 @@ flash-and-chime when an item ends.
   an empty body when free, or one newline-terminated `today keepout:` line
   naming the item and how to unlock it (Done, for now), or its unlock time as
   HH:MM in the routine's timezone. Errors retain their JSON shape and status.
+- `POST /api/routine/proof {proof, note?}` records a private `wake`, `photo`, or
+  `away` proof for the current keepout that needs it, or an open keepout window.
+  Optional `day` and `key` together select an item explicitly. Proofs follow
+  Done's timing and action-order rules; retries preserve the first timestamp
+  and note (up to 200 characters). The response includes the updated item and
+  keepout. All required proofs complete an item; an `until done` condition
+  still requires the button. Done overrides all proofs until phase 6.
+  `GET /api/routine` exposes item `proofs`; keepout JSON adds `have` alongside
+  the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds an eligible
+  `item` (key, window start/end, required away minutes), or null when blocked,
+  completed, opted out, or on a day off. Collectors count away time from that
+  window's start and post with its day/key. Proofs retain today's and yesterday's
+  progress only.
 - `PUT /api/routine/away {day, away, reason}` sets days off only after the current
   routine day; `GET /api/routine` lists days off from the current day onward.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth

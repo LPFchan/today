@@ -144,7 +144,8 @@ final class Model {
 
     private func syncWakeAlarm() {
         guard live else { return }
-        wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true)
+        wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true
+            && keepout?.have.contains("wake") != true)
     }
 
     /// Restore system audio before a normal termination, logout or restart.

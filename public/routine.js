@@ -325,15 +325,23 @@ export function routineSchedule(day) {
   return { text, anchor: day.anchor };
 }
 
-function progress(day, item, status, now) {
+export function progress(day, item, status, now) {
   const startedAt = Number.isFinite(status?.startedAt) ? Math.max(item.start, status.startedAt) : null;
   const since = item.kind === 'window' ? Math.min(startedAt ?? item.end, item.end) : item.start;
   const doneAfter = since + item.minMinutes * MINUTE;
-  const doneAt = status?.doneAt;
   // A window finished before it locked never locks at all.
-  const early = item.kind === 'window' && doneAt >= item.start && doneAt < since;
-  const done = Number.isFinite(doneAt) && (early || doneAt >= doneAfter) && doneAt < day.ends && doneAt <= now;
-  return { since, doneAfter, done, startedAt };
+  const counts = (at) => Number.isFinite(at) && at >= item.start && at < day.ends && at <= now
+    && ((item.kind === 'window' && at < since) || at >= doneAfter);
+  const proofs = Object.fromEntries(item.until.filter((proof) => proof !== 'done'
+    && counts(status?.proofs?.[proof]?.at)).map((proof) => [proof, status.proofs[proof]]));
+  const done = counts(status?.doneAt) || (item.until.length > 0 && !item.until.includes('done')
+    && item.until.every((proof) => Object.hasOwn(proofs, proof)));
+  return { since, doneAfter, done, startedAt, proofs };
+}
+
+/** Requirements still outstanding; Done remains an explicit button action. */
+export function remainingNeeds(lock) {
+  return lock.needs.filter((need) => need === 'done' || !(lock.have ?? []).includes(need));
 }
 
 /** Current keepout; proof-bearing locks expire at the next instance's start. */
@@ -348,9 +356,9 @@ export function keepoutState(day, statuses, now) {
     if (!locked || (state && state.since <= p.since)) continue;
     state = {
       key: item.key, name: item.name, kind: item.kind, since: p.since,
-      until: proof ? null : item.end, needs: [...item.until],
+      until: proof ? null : item.end, needs: [...item.until], have: Object.keys(p.proofs),
       canStart: item.kind === 'window' && p.startedAt === null && now < item.end,
-      // Temporary: done satisfies every condition until proofs and bypasses land.
+      // Temporary: Done satisfies every condition until phase 6.
       canDone: proof && now >= p.doneAfter,
       doneAfter: p.doneAfter,
     };
