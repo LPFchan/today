@@ -281,6 +281,12 @@ final class Model {
         finishing = false
         clearKeepout()
         session = .signedOut
+        // Like signing out: the login item stops being forced on.
+        enforcing = false
+        if live, !preview {
+            UserDefaults.standard.set(false, forKey: "enforcing")
+            syncLoginItem()
+        }
         people = []
         updated = nil
         problem = Account.Failure.signedOut.localizedDescription
