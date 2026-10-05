@@ -44,6 +44,11 @@ const STRINGS = {
 
     editorTitle: '오늘 시간표',
     editorLabel: '시간표',
+    editorRoutineOn: '자동 루틴: 켜짐',
+    editorRoutineOff: '자동 루틴: 꺼짐',
+    editorRoutineUnknown: '자동 루틴: 확인 중',
+    editorRoutineSettings: '자동 루틴 설정',
+    editorRoutineHint: '자동 루틴이 오늘 시간표를 채워줘요.',
     editorPlaceholder: '09:00-10:30 중요한 일\n10:30 다음 할 일\n12:30-13:30 점심\n# 메모는 이렇게',
     start: '시작',
     save: '저장',
@@ -225,6 +230,11 @@ const STRINGS = {
 
     editorTitle: 'Today’s plan',
     editorLabel: 'Plan',
+    editorRoutineOn: 'auto-routine: on',
+    editorRoutineOff: 'auto-routine: off',
+    editorRoutineUnknown: 'auto-routine: unknown',
+    editorRoutineSettings: 'Auto-routine settings',
+    editorRoutineHint: 'Today’s plan is filled by auto-routine.',
     editorPlaceholder: '09:00-10:30 Deep work\n10:30 Email\n12:30-13:30 Lunch\n# notes start with a hash',
     start: 'Start',
     save: 'Save',

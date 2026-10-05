@@ -26,7 +26,10 @@ flash-and-chime when an item ends.
   screen.
 - `today.lost.plus/everyone` — a shared timeline: every public person's day on
   one hour axis, with what they're doing now.
-- `today.lost.plus/routine` — auto-routine, opt-in and unlinked: a recurring
+- “Today’s plan” shows auto-routine’s on/off status and a settings link to
+  `/routine`. While enabled, the daily text editor, Start/Save and Clear are
+  disabled; the preview and visibility controls remain available.
+- `today.lost.plus/routine` — auto-routine, opt-in: a recurring
   routine (`public/routine.js` format) that writes each day's plan, with
   keepout items that lock until done. Turning it on is self-serve; turning
   it off goes through Hermes. Start-only lines end at the next line’s start;

@@ -147,12 +147,13 @@ async function upsertPerson(env, me, fields = {}) {
 }
 
 async function profile(env, me) {
-  await currentRoutine(env, me);
+  const routine = await currentRoutine(env, me);
   let row = await person(env, me.sub);
   if (!row || row.name !== me.name) row = await upsertPerson(env, me);
   return {
     me: { sub: me.sub, name: me.name, email: me.email },
     visibility: row.visibility,
+    routineEnabled: Boolean(routine.row?.enabled),
     schedule: row.schedule ? { text: row.schedule, anchor: row.anchor } : null,
   };
 }
