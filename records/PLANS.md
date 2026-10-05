@@ -41,6 +41,10 @@ Product rule for every phase: routine and keepout are opt-in per person and
 off by default. Users who haven't opted in (marie) see no change on the web,
 the board, the watch or the Mac app.
 
+Last gate: the operator turns auto-routine on only after phases 4–6 ship, so
+every lock has a working way out (proofs, Hermes bypasses, switching off)
+before it binds.
+
 ## Sequencing
 
 ### Near Term
