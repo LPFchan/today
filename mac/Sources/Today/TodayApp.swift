@@ -72,6 +72,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        model.stopWakeAlarm()
         ProcessOwnership.exitNormally()
     }
 

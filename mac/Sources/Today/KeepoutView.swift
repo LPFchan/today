@@ -9,6 +9,8 @@ struct KeepoutView: View {
     let busy: Bool
     let problem: String?
     let done: () -> Void
+    /// The notch's height on screens that have one.
+    var topInset: CGFloat = 0
 
     var body: some View {
         ZStack {
@@ -17,7 +19,7 @@ struct KeepoutView: View {
                 Label("today", systemImage: "clock")
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(Self.meta)
-                    .padding(.top, 28)
+                    .padding(.top, 28 + topInset)
                 Spacer()
                 VStack(spacing: 0) {
                     Text(lock.name)

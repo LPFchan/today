@@ -43,6 +43,24 @@ On your own Mac, a debug build accepts `--fake-keepout 30` for a 30-second
 preview with no network or login-item changes; Done also ends it. This path
 is absent from release builds. Do not run this preview on a shared host.
 
+## Wake alarm
+
+A keepout needing `wake` loops Radial, the ringtone that ships with macOS
+(ToneLibrary's `Radial-EncoreInfinitum.m4r`). Each launch copies it to
+`~/Library/Application Support/today/` in case a later macOS moves it; Glass
+loops if neither is readable. Nothing is downloaded. Keepout polls every three seconds while
+ringing, so Done from the web or Hermes also stops it.
+
+The default output is unmuted and ramps from 20% to 50% (half the volume
+slider) over 5 seconds.
+Stopping, signing out or normal app termination restores its previous volume
+and mute state. Output devices without writable volume controls retain their
+hardware settings.
+
+A debug build accepts `--fake-wake 70` to test playback and the full ramp;
+Done ends it early. Run it only on your own Mac. Snapshots and Xcode previews
+never ring or change audio settings.
+
 ## Build
 
 Needs Xcode 16 or its Command Line Tools on Apple silicon.
