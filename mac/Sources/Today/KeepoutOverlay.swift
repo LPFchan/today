@@ -21,6 +21,13 @@ final class KeepoutOverlay {
             // Activate after the resignation finishes, rather than inside it.
             Task { @MainActor [weak self] in self?.front() }
         })
+        // Another app can take focus without us ever having had it, say when
+        // the lock comes up while you're typing elsewhere.
+        observers.append(NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] note in
+            let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+            guard app?.processIdentifier != ProcessInfo.processInfo.processIdentifier else { return }
+            Task { @MainActor [weak self] in self?.front() }
+        })
         observe()
     }
 
@@ -65,7 +72,9 @@ final class KeepoutOverlay {
     private func front() {
         guard model.keepout != nil, shown, !endingSession else { return }
         for window in windows { window.orderFrontRegardless() }
-        NSApp.activate()
+        // Plain activate() waits for the frontmost app to yield, which it
+        // never does, so keys like Cmd+Q would reach the app underneath.
+        NSApp.activate(ignoringOtherApps: true)
         windows.first { $0.interactive }?.makeKeyAndOrderFront(nil)
     }
 
