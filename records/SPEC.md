@@ -70,6 +70,15 @@ flash-and-chime when an item ends.
   completed, opted out, or on a day off. Collectors count away time from that
   window's start and post with its day/key. Proofs retain today's and yesterday's
   progress only.
+- `POST /api/routine/affordance {action, day, key?, reason, requestId}` accepts
+  explicit current-day `bypass` or `off` controls. Bypass uses the exact item key;
+  off omits it. The gateway requires the shared Today bearer token. Atomic receipts
+  bind subject, day and numeric routine instance; identical retries preserve the
+  receipt. Re-enable creates a fresh instance and clears live progress.
+- `GET /api/routine/report?day=YYYY-MM-DD` exposes private observed routine history
+  for seven elapsed days after each instance ends. Incomplete days return 409;
+  absent observations are missing coverage, never fabricated misses. Reports retain
+  deadline misses after late completion and distinguish bypass, off and recovery.
 - `PUT /api/routine/away {day, away, reason}` sets days off only after the current
   routine day; `GET /api/routine` lists days off from the current day onward.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
@@ -81,5 +90,5 @@ flash-and-chime when an item ends.
 
 - Editing from the watch or the Mac app.
 - Friend lists, unlisted links, or per-person sharing.
-- History of past days. A plan is replaced when you start a new one;
-  auto-routine keeps only today's and yesterday's item progress.
+- General plan history. A plan is replaced when you start a new one;
+  private observed routine reporting has a bounded seven-day retention window.

@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-06:
+  - Change: scoped bypass/off receipts and observed routine reports are deployed from PR #15 (`cfdcb90`), with D1 migration 0006 applied and Worker version `7610bec1-7f19-4456-892e-2793fe21374e`. Common Auth's shared-token routes are deployed. Read-only production checks confirm no active keepout, 409 for an incomplete day and missing coverage for an unobserved ended day.
+  - Why it matters: Today now owns durable escape receipts and reporting without inventing past activity. Hermes command/tool delivery, private home verification and an approved Mac release remain activation gates. Auto-routine remains off and Done remains the temporary override.
+
+- 2026-10-06:
   - Change: private wake/photo/away proofs and collector eligibility are deployed; D1 migration 0005 is applied. Live bearer checks return null eligibility while the operator's routine is off and reject malformed proofs. Common Auth's proof route is reachable.
   - Why it matters: accepted proofs can satisfy routine conditions independently. Mac proof-aware alarm and unlock instructions compile and pass CI, but are not distributed in a new release. Meal ingestion, private home verification, cleaning completion reporting and Hermes bypass/off remain activation gates; Done remains the temporary override.
 

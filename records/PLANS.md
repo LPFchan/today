@@ -53,8 +53,10 @@ before it binds.
   - Why now: item status and the alarm are in place; proofs are the next way out of a lock.
   - Available foundation: Today proof storage/eligibility and the Common Auth
     bearer proof route are deployed; Find My is reachable on dumpling.
-  - Remaining dependencies: verify the private home mapping, connect meal-photo
-    ingestion and private nutrition logging, and report vacuum completion.
+  - Remaining dependencies: verify the private home mapping and connect the landed
+    private meal/nutrition implementation to trusted Telegram transport. Brief's
+    vacuum evidence reporter is landed; vendor history cannot certify the exact
+    room and three passes, so delivery must preserve that uncertainty.
     Mac proof-aware source also needs an operator-approved release before distribution.
   - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
     calorie estimate); 30+ minutes away from home via Find My; results posted
@@ -68,8 +70,10 @@ before it binds.
 
 - Phase 6 — away mode and affordances:
   - Why later: bypasses matter once the lock is real.
+  - Available foundation: Today's scoped affordance/report APIs and shared-token
+    Common Auth routes are deployed.
   - Dependencies: phases 1, 4, 5 (every proof exists before the temporary
-    "done" path goes away); an auth route that lets Hermes grant affordances.
+    "done" path goes away); tested Hermes tool wiring and confirmed report delivery.
   - Scope: days off from the calendar already ship (phase 4); a Hermes tool that grants one
     item for today only, or switches auto-routine off (DEC-20261005-002), with
     a guideline to weigh the request; brief reports
