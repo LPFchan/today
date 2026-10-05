@@ -62,7 +62,7 @@ final class KeepoutOverlay {
             window.hidesOnDeactivate = false
             window.setFrame(screen.frame, display: true)
             if window.interactive {
-                window.contentView = NSHostingView(rootView: CoverContent(model: model))
+                window.contentView = NSHostingView(rootView: CoverContent(model: model, topInset: screen.safeAreaInsets.top))
             }
             windows.append(window)
         }
@@ -87,10 +87,11 @@ final class KeepoutOverlay {
 
 private struct CoverContent: View {
     let model: Model
+    let topInset: CGFloat
 
     var body: some View {
         if let lock = model.keepout {
-            KeepoutView(lock: lock, next: model.next, now: model.now, busy: model.finishing, problem: model.finishProblem, done: model.finish)
+            KeepoutView(lock: lock, next: model.next, now: model.now, busy: model.finishing, problem: model.finishProblem, done: model.finish, topInset: topInset)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(white: 0.06))
                 .environment(\.colorScheme, .dark)

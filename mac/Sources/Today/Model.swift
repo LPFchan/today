@@ -7,8 +7,12 @@ import ServiceManagement
 final class Model {
     enum Session: Equatable { case signedOut, signingIn, signedIn }
 
-    var session: Session = TokenStore.load() == nil ? .signedOut : .signedIn
-    var keepout: Keepout?
+    var session: Session = TokenStore.load() == nil ? .signedOut : .signedIn {
+        didSet { syncWakeAlarm() }
+    }
+    var keepout: Keepout? {
+        didSet { syncWakeAlarm() }
+    }
     var keepoutDay: String?
     var finishing = false
     var finishProblem: String?
@@ -33,6 +37,7 @@ final class Model {
     }
 
     @ObservationIgnored private let live: Bool
+    @ObservationIgnored private var wakeAlarm: WakeAlarm?
     /// When each person's running item started, as of the last tick; nil
     /// until a board has loaded, so launching doesn't announce what's
     /// already running.
@@ -57,10 +62,14 @@ final class Model {
 
     /// `live: false` makes a model that never ticks or fetches, for snapshots.
     init(live: Bool = true) {
-        self.live = live
-        guard live else { return }
+        self.live = live && !CommandLine.arguments.contains("--snapshot")
+            && ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] != "1"
+        guard self.live else { return }
+        wakeAlarm = WakeAlarm()
+        WakeAlarm.keepCopy()
         #if DEBUG
-        if let flag = CommandLine.arguments.firstIndex(of: "--fake-keepout"),
+        let wakeFlag = CommandLine.arguments.firstIndex(of: "--fake-wake")
+        if let flag = wakeFlag ?? CommandLine.arguments.firstIndex(of: "--fake-keepout"),
            flag + 1 < CommandLine.arguments.count,
            let seconds = Double(CommandLine.arguments[flag + 1]), seconds.isFinite, seconds > 0 {
             fakeKeepout = true
@@ -69,7 +78,7 @@ final class Model {
                 "key": "fake", "name": L10n.tr("Today"), "kind": "fixed",
                 "since": now.timeIntervalSince1970 * 1000,
                 "until": now.addingTimeInterval(seconds).timeIntervalSince1970 * 1000,
-                "needs": ["done"], "canStart": false, "canDone": true,
+                "needs": wakeFlag == nil ? ["done"] : ["wake"], "canStart": false, "canDone": true,
                 "doneAfter": now.timeIntervalSince1970 * 1000,
             ]
             if let data = try? JSONSerialization.data(withJSONObject: body) {
@@ -106,6 +115,7 @@ final class Model {
             syncLoginItem()
             if LoginItem.service.status == .enabled { ProcessOwnership.startAgent() }
         }
+        syncWakeAlarm()
         let tick = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
@@ -132,6 +142,14 @@ final class Model {
 
     var next: Item? { people.first { $0.me }?.items.first { $0.start > now } }
 
+    private func syncWakeAlarm() {
+        guard live else { return }
+        wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true)
+    }
+
+    /// Restore system audio before a normal termination, logout or restart.
+    func stopWakeAlarm() { wakeAlarm?.setRinging(false) }
+
     private func tick() {
         now = Date()
         if preview {
@@ -149,7 +167,7 @@ final class Model {
             }
         }
         if now.timeIntervalSince(lastLoginTry) >= 15 { syncLoginItem() }
-        let keepoutInterval: TimeInterval = expiredKeepoutUntil == nil ? 15 : 3
+        let keepoutInterval: TimeInterval = expiredKeepoutUntil == nil && wakeAlarm?.ringing != true ? 15 : 3
         if now.timeIntervalSince(lastKeepoutTry) >= keepoutInterval { refreshKeepout() }
         // Plans change rarely; the timers run locally in between.
         if session == .signedIn, now.timeIntervalSince(lastTry) >= 60 { refresh() }
