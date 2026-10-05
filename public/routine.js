@@ -336,7 +336,11 @@ export function progress(day, item, status, now) {
     && counts(status?.proofs?.[proof]?.at)).map((proof) => [proof, status.proofs[proof]]));
   const done = counts(status?.doneAt) || (item.until.length > 0 && !item.until.includes('done')
     && item.until.every((proof) => Object.hasOwn(proofs, proof)));
-  return { since, doneAfter, done, startedAt, proofs };
+  const bypass = status?.bypass;
+  const bypassed = item.keepout && item.until.length > 0 && bypass?.day === day.day
+    && bypass.key === item.key && Number.isFinite(bypass.at)
+    && bypass.at >= item.start && bypass.at < day.ends && bypass.at <= now;
+  return { since, doneAfter, done, startedAt, proofs, bypassed };
 }
 
 /** Requirements still outstanding; Done remains an explicit button action. */
@@ -352,7 +356,7 @@ export function keepoutState(day, statuses, now) {
     if (!item.keepout || now < item.start) continue;
     const p = progress(day, item, statuses?.[item.key], now);
     const proof = item.until.length > 0;
-    const locked = proof ? now >= p.since && !p.done : now < item.end;
+    const locked = proof ? now >= p.since && !p.done && !p.bypassed : now < item.end;
     if (!locked || (state && state.since <= p.since)) continue;
     state = {
       key: item.key, name: item.name, kind: item.kind, since: p.since,
@@ -370,6 +374,7 @@ export function keepoutState(day, statuses, now) {
 export function itemPhase(day, item, status, now) {
   if (item.keepout && item.until.length) {
     const p = progress(day, item, status, now);
+    if (p.bypassed) return 'bypassed';
     if (p.done) return 'done';
     if (now >= day.ends) return 'missed';
     if (now >= item.start && now >= p.since) return 'locked';
@@ -378,4 +383,30 @@ export function itemPhase(day, item, status, now) {
   if (now >= item.end) return 'past';
   if (item.keepout && item.kind === 'fixed') return 'locked';
   return 'open';
+}
+
+/** Report only observed instances; evidence retains its original timestamps. */
+export function reportInstance(snapshot) {
+  const { day, statuses, observedAt, stoppedAt, away } = snapshot;
+  const cutoff = Math.min(day.ends, stoppedAt ?? day.ends);
+  return day.items.map((item) => {
+    const status = statuses[item.key];
+    const deadline = Math.min(item.end, day.ends - 1);
+    const common = { key: item.key, name: item.name, deadline };
+    if (away || !item.keepout || !item.until.length) {
+      return { ...common, outcome: 'skipped', missedDeadline: false };
+    }
+    if (item.start >= cutoff) return { ...common, outcome: 'skipped', missedDeadline: false };
+    const byDeadline = progress(day, item, status, Math.min(deadline, cutoff));
+    const final = progress(day, item, status, cutoff);
+    const missedDeadline = deadline > cutoff ? false
+      : byDeadline.done || byDeadline.bypassed ? false
+        : observedAt <= deadline || final.done || final.bypassed ? true : null;
+    return { ...common,
+      outcome: final.bypassed ? 'bypassed' : final.done ? 'done'
+        : stoppedAt !== null ? 'released' : observedAt <= deadline ? 'missed' : 'unknown',
+      missedDeadline,
+      proofs: final.proofs, doneAt: status?.doneAt ?? null,
+    };
+  });
 }
