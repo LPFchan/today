@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-06:
+  - Change: the plan dialog’s compact auto-routine indicator and settings link are deployed from PR #16 (`5e7e49e`), Worker version `1fcccb24-42ad-4339-865c-5ad704782ae7`. Enabled routines grey out daily editing and disable Save/Start and Clear; preview and visibility remain available.
+  - Why it matters: routine settings are reachable from the existing editor. 141 tests and desktop/mobile browser checks passed; Codex’s current-head review had no findings. Read-only production keepout is inactive. The signed-in production page was not directly verified because machine credentials are refused on browser-only routes; activation remains gated.
+
+- 2026-10-06:
   - Change: scoped bypass/off receipts and observed routine reports are deployed from PR #15 (`cfdcb90`), with D1 migration 0006 applied and Worker version `7610bec1-7f19-4456-892e-2793fe21374e`. Common Auth's shared-token routes are deployed. Read-only production checks confirm no active keepout, 409 for an incomplete day and missing coverage for an unobserved ended day.
   - Why it matters: Today now owns durable escape receipts and reporting without inventing past activity. Hermes command/tool delivery, private home verification and an approved Mac release remain activation gates. Auto-routine remains off and Done remains the temporary override.
 
