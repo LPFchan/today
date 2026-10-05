@@ -30,6 +30,10 @@ const el = {
   planError: $('#planError'),
   startButton: $('#startButton'),
   clearButton: $('#clearButton'),
+  editorRoutineStatus: $('#editorRoutineStatus'),
+  editorRoutineLabel: $('#editorRoutineLabel'),
+  editorRoutineHint: $('#editorRoutineHint'),
+  routineSettings: $('#routineSettings'),
   visibilityHint: $('#visibilityHint'),
   previewGuide: $('#previewGuide'),
   previewList: $('#previewList'),
@@ -61,6 +65,8 @@ const PLAN_REFRESH_MS = 5 * 60_000;
 const state = {
   me: null, // { sub, name, email }
   visibility: 'private',
+  routineEnabled: null, // unknown until the signed-in profile is read
+  savingPlan: false,
   schedule: null, // { text, anchor }
   items: [], // absolute items of my schedule
   board: null, // { people }
@@ -150,12 +156,20 @@ function applyProfile(profile) {
     && state.schedule?.anchor === profile.schedule?.anchor;
   state.me = profile.me;
   state.visibility = profile.visibility;
+  const wasRoutine = state.routineEnabled;
+  state.routineEnabled = typeof profile.routineEnabled === 'boolean' ? profile.routineEnabled : null;
   state.schedule = profile.schedule;
   state.items = profile.schedule ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor) : [];
   if (!samePlan) state.completed = null;
   if (switched) location.reload();
   renderAccount();
   renderVisibility();
+  renderEditorRoutine();
+  if (el.editor.open) {
+    if (state.routineEnabled === true) el.planInput.value = state.schedule?.text ?? '';
+    else if (wasRoutine !== false && state.routineEnabled === false) el.planInput.value = loadDraft() ?? state.schedule?.text ?? '';
+    renderPreview();
+  }
   renderMine(true);
 }
 
@@ -573,15 +587,29 @@ function renderPreview() {
   el.previewTotal.hidden = false;
 }
 
+function renderEditorRoutine() {
+  const enabled = state.routineEnabled;
+  el.editorRoutineStatus.classList.toggle('is-on', enabled === true);
+  el.editorRoutineLabel.textContent = t(enabled === null ? 'editorRoutineUnknown' : enabled ? 'editorRoutineOn' : 'editorRoutineOff');
+  el.editorRoutineHint.hidden = enabled !== true;
+  el.planInput.setAttribute('aria-describedby', enabled === true ? 'planError editorRoutineHint' : 'planError');
+  el.planInput.disabled = enabled !== false;
+  el.clearButton.disabled = enabled !== false || state.savingPlan;
+  el.startButton.disabled = enabled !== false || state.savingPlan;
+  if (enabled !== false && el.shiftDialog.open) el.shiftDialog.close();
+}
+
 function openEditor() {
   if (el.editor.open) return;
-  el.planInput.value = loadDraft() ?? state.schedule?.text ?? '';
+  el.planInput.value = state.routineEnabled === true ? state.schedule?.text ?? '' : loadDraft() ?? state.schedule?.text ?? '';
   const running = anchorForEdit(Date.now()) === state.schedule?.anchor;
   el.startButton.textContent = t(running ? 'save' : 'start');
   renderVisibility();
+  renderEditorRoutine();
   renderPreview();
   el.editor.showModal();
-  requestAnimationFrame(() => el.planInput.focus());
+  requestAnimationFrame(() => (el.planInput.disabled ? el.routineSettings : el.planInput).focus());
+  loadProfile().catch((error) => showToast(error.message));
 }
 
 function renderAlert() {
@@ -595,6 +623,7 @@ function anchorForEdit(now) {
 }
 
 function requestStart(text) {
+  if (state.routineEnabled !== false || state.savingPlan) return;
   let parsed;
   try {
     parsed = parseSchedule(text);
@@ -629,8 +658,10 @@ function requestStart(text) {
 }
 
 async function commit(parsed, anchor) {
+  if (state.routineEnabled !== false || state.savingPlan) return;
   const text = serializeSchedule(parsed);
-  el.startButton.disabled = true;
+  state.savingPlan = true;
+  renderEditorRoutine();
   try {
     applyProfile(await request('PUT', '/api/schedule', { text, anchor }));
     clearDraft();
@@ -641,11 +672,15 @@ async function commit(parsed, anchor) {
   } catch (error) {
     showError(error.message);
   } finally {
-    el.startButton.disabled = false;
+    state.savingPlan = false;
+    renderEditorRoutine();
   }
 }
 
 async function clearPlan() {
+  if (state.routineEnabled !== false || state.savingPlan) return;
+  state.savingPlan = true;
+  renderEditorRoutine();
   try {
     applyProfile(await request('DELETE', '/api/schedule'));
     clearDraft();
@@ -654,6 +689,9 @@ async function clearPlan() {
     showToast(t('cleared'));
   } catch (error) {
     showToast(error.message);
+  } finally {
+    state.savingPlan = false;
+    renderEditorRoutine();
   }
 }
 
@@ -766,6 +804,7 @@ el.editorForm.addEventListener('submit', (event) => {
   requestStart(el.planInput.value);
 });
 el.planInput.addEventListener('input', () => {
+  if (state.routineEnabled !== false) return;
   renderPreview();
   saveDraft(el.planInput.value);
 });

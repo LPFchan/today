@@ -140,7 +140,7 @@ test('opted-out users retain their profile, board and watch; routine reads write
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
   const initial = await call('GET', '/api/me');
   assert.deepEqual(initial.body, {
-    me: { sub: 'owner', name: 'owner', email: 'owner@example.com' }, visibility: 'private', schedule: null,
+    me: { sub: 'owner', name: 'owner', email: 'owner@example.com' }, visibility: 'private', routineEnabled: false, schedule: null,
   });
   await call('PUT', '/api/schedule', { text: '12:00-13:00 Work', anchor: instant('00:00') });
   const before = DB.raw.prepare('SELECT * FROM people').all();
@@ -164,6 +164,20 @@ test('opted-out users retain their profile, board and watch; routine reads write
     text: '12:00-13:00 Work', anchor: instant('00:00'),
   });
   assert.equal((await call('GET', '/api/routine')).body.today, null);
+});
+
+test('profile reports enabled state independently of active keepout and days off', async (t) => {
+  const { enable, call, DB } = setup(t);
+  assert.equal((await call('GET', '/api/me')).body.routineEnabled, false);
+  await enable('12:00-13:00 Free');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  assert.equal((await call('GET', '/api/me')).body.routineEnabled, true);
+  DB.raw.prepare('INSERT INTO routine_away (sub, day, reason, created_at) VALUES (?, ?, ?, ?)')
+    .run('owner', '2026-10-05', 'Day off', Date.now());
+  assert.equal((await call('GET', '/api/me')).body.routineEnabled, true);
+  assert.equal((await call('PUT', '/api/visibility', { visibility: 'public' })).body.routineEnabled, true);
+  DB.raw.prepare('UPDATE routines SET enabled = 0 WHERE sub = ?').run('owner');
+  assert.equal((await call('GET', '/api/me')).body.routineEnabled, false);
 });
 
 test('enabling materializes the routine into the profile, watch and public board', async (t) => {

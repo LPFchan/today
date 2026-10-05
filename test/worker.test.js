@@ -48,7 +48,7 @@ test('saving, reading and clearing a schedule', async () => {
 
   const first = await call('GET', '/api/me', { headers: me });
   assert.equal(first.status, 200);
-  assert.deepEqual(first.body, { me: { sub: '1', name: 'Yeowool Kim', email: '1@example.com' }, visibility: 'private', schedule: null });
+  assert.deepEqual(first.body, { me: { sub: '1', name: 'Yeowool Kim', email: '1@example.com' }, visibility: 'private', routineEnabled: false, schedule: null });
 
   const saved = await call('PUT', '/api/schedule', { headers: me, body: { text: '09:00 Work\n12:00-13:00 점심', anchor: midnight() } });
   assert.equal(saved.status, 200);
