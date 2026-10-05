@@ -100,9 +100,13 @@ export function formatClock(totalMinutes) {
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
 }
 
-/** Canonical text for parsed items: every line gets an explicit end. */
+/** Canonical text: moments keep a start only; other items get an explicit end. */
 export function serializeSchedule(items) {
-  return items.map((item) => `${formatClock(item.start)}-${formatClock(item.end)} ${item.name}`).join('\n');
+  return items.map((item) => {
+    const time = item.end === item.start
+      ? formatClock(item.start) : `${formatClock(item.start)}-${formatClock(item.end)}`;
+    return `${time} ${item.name}`;
+  }).join('\n');
 }
 
 /** Items with absolute times (epoch ms), given the anchor's local midnight. */

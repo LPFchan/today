@@ -83,6 +83,8 @@ async function api(request, env, url) {
       return json(200, await routineProfile(env, me));
     case 'PUT /api/routine':
       return saveRoutine(request, env, me);
+    case 'PUT /api/routine/away':
+      return saveAway(request, env, me);
     case 'POST /api/routine/start':
       return routineStatus(request, env, me, 'start');
     case 'POST /api/routine/done':
@@ -214,8 +216,16 @@ async function currentRoutine(env, me, now = Date.now()) {
     throw error;
   }
   if (!row.enabled) return result;
+  result.day = day;
+  const away = await env.DB.prepare('SELECT day FROM routine_away WHERE sub = ?1 AND day = ?2')
+    .bind(me.sub, day.day).first();
+  if (away) {
+    result.today = { day: day.day, items: [], keepout: null };
+    return result;
+  }
   // Opting in skips ended slots; open windows and ongoing items stay owed.
-  day.items = day.items.map((item) => item.end <= row.enabled_at
+  day.items = day.items.map((item) => (item.start === item.end
+    ? item.start < row.enabled_at : item.end <= row.enabled_at)
     ? { ...item, keepout: false } : item);
   if (row.materialized_day !== day.day) {
     const schedule = routineSchedule(day);
@@ -267,8 +277,45 @@ function routineValue(routine) {
   };
 }
 
+function currentRoutineDay(routine, now = Date.now()) {
+  if (routine.day) return routine.day.day;
+  const row = { ...DEFAULT_PLACE, text: DEFAULT_ROUTINE, ...routine.row };
+  try {
+    return routineInstance(row, now, null).day;
+  } catch (error) {
+    if (!(error instanceof RoutineError)) throw error;
+    return zonedDate(now, row.tz);
+  }
+}
+
 async function routineProfile(env, me) {
-  return routineValue(await currentRoutine(env, me));
+  const routine = await currentRoutine(env, me);
+  const { results: away } = await env.DB.prepare(
+    'SELECT day, reason FROM routine_away WHERE sub = ?1 AND day >= ?2 ORDER BY day',
+  ).bind(me.sub, currentRoutineDay(routine)).all();
+  return { ...routineValue(routine), away };
+}
+
+async function saveAway(request, env, me) {
+  const body = await request.json().catch(() => null);
+  const epoch = typeof body?.day === 'string' ? Date.parse(`${body.day}T00:00:00Z`) : NaN;
+  if (!body || !/^\d{4}-\d{2}-\d{2}$/.test(body.day) || !Number.isFinite(epoch)
+      || new Date(epoch).toISOString().slice(0, 10) !== body.day
+      || typeof body.away !== 'boolean' || (body.reason ?? '') !== String(body.reason ?? '')
+      || [...(body.reason ?? '')].length > 200) return json(400, { error: 'bad_request' });
+  const routine = await currentRoutine(env, me);
+  const day = currentRoutineDay(routine);
+  if (body.away && body.day <= day) return json(409, { error: 'too_late' });
+  if (body.away) {
+    await env.DB.prepare(
+      'INSERT INTO routine_away (sub, day, reason, created_at) VALUES (?1, ?2, ?3, ?4) ' +
+        'ON CONFLICT (sub, day) DO UPDATE SET reason = ?3',
+    ).bind(me.sub, body.day, body.reason ?? '', Date.now()).run();
+  } else {
+    await env.DB.prepare('DELETE FROM routine_away WHERE sub = ?1 AND day = ?2')
+      .bind(me.sub, body.day).run();
+  }
+  return json(200, await routineProfile(env, me));
 }
 
 async function saveRoutine(request, env, me) {
@@ -330,7 +377,7 @@ async function routineStatus(request, env, me, action) {
   const now = Date.now();
   const routine = await currentRoutine(env, me, now);
   const unavailable = action === 'start' ? 'not_open' : 'not_due';
-  if (!routine.day || body.day !== routine.day.day) return json(409, { error: unavailable });
+  if (!routine.day || !routine.statuses || body.day !== routine.day.day) return json(409, { error: unavailable });
   const item = routine.day.items.find((item) => item.key === body.key);
   if (!item) return json(action === 'start' ? 404 : 409, {
     error: action === 'start' ? 'not_found' : 'not_due',

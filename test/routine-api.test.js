@@ -134,7 +134,7 @@ test('routine routes require gateway identity and reject malformed writes', asyn
 test('opted-out users retain their profile, board and watch; routine reads write nothing', async (t) => {
   const { call, DB } = setup(t);
   assert.deepEqual((await call('GET', '/api/routine')).body, {
-    enabled: false, text: DEFAULT_ROUTINE, pendingFrom: null, tz: 'Asia/Seoul', today: null,
+    enabled: false, text: DEFAULT_ROUTINE, pendingFrom: null, tz: 'Asia/Seoul', today: null, away: [],
   });
   assert.deepEqual((await call('GET', '/api/keepout')).body, { now: Date.now(), day: null, keepout: null });
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
@@ -516,7 +516,7 @@ test('text edits while off apply immediately without writing a day plan', async 
     const saved = await call('PUT', '/api/routine', { text });
     assert.equal(saved.status, 200);
     assert.deepEqual(saved.body, {
-      enabled: false, text, pendingFrom: null, tz: 'Asia/Seoul', today: null,
+      enabled: false, text, pendingFrom: null, tz: 'Asia/Seoul', today: null, away: [],
     });
     const row = DB.raw.prepare('SELECT * FROM routines').get();
     assert.equal(row.text, text);
@@ -948,4 +948,105 @@ test('RoutineError on reread leaves the routine unavailable and preserves the ma
   assert.equal((await call('GET', '/api/watch')).status, 200);
   assert.equal((await call('GET', '/api/board')).status, 200);
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, null);
+});
+
+
+test('default point keepouts are sequential even when enabling exactly at their shared start', async (t) => {
+  const { enable, call, status, at } = setup(t, '12:00');
+  const enabled = await enable(DEFAULT_ROUTINE);
+  assert.equal(enabled.status, 200);
+  const [wake, wash] = enabled.body.today.items;
+  assert.equal(wake.phase, 'locked');
+  assert.equal(wake.start, wake.end);
+  assert.equal(wash.key, '12:00#2');
+  assert.equal(wash.name, 'wash face, brush teeth');
+  assert.deepEqual(enabled.body.today.keepout.needs, ['wake']);
+  assert.equal((await call('GET', '/api/me')).body.schedule.text.split('\n')[0],
+    '12:00 wake up');
+  expectError(await status('done', wash.key), 409, 'locked');
+  at('12:40');
+  const done = await status('done', wake.key);
+  assert.equal(done.status, 200);
+  assert.equal(done.body.today.keepout.key, wash.key);
+  assert.deepEqual(done.body.today.keepout.needs, ['done']);
+  assert.equal(done.body.today.items[1].phase, 'locked');
+  assert.equal((await status('done', wash.key)).status, 200);
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+});
+
+test('away requires identity and validates calendar days, boolean and reason length', async (t) => {
+  const { call, DB } = setup(t);
+  const valid = { day: '2026-10-06', away: true, reason: 'Trip' };
+  expectError(await call('PUT', '/api/routine/away', valid, null), 401, 'unauthenticated');
+  for (const body of [null, {}, { ...valid, day: '2026-02-30' }, { ...valid, day: '2026-2-03' },
+    { ...valid, day: 1 }, { ...valid, away: 1 }, { ...valid, reason: 1 },
+    { ...valid, reason: 'x'.repeat(201) }]) {
+    expectError(await call('PUT', '/api/routine/away', body), 400, 'bad_request');
+  }
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_away').get().n, 0);
+  assert.equal((await call('PUT', '/api/routine/away', { ...valid, reason: '🦊'.repeat(200) })).status, 200);
+});
+
+test('away day-ahead rule uses the routine day, lists only owner current and future days, and clears', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable();
+  const away = (day, value = true, reason = 'Trip', sub = 'owner') =>
+    call('PUT', '/api/routine/away', { day, away: value, reason }, sub);
+  expectError(await away('2026-10-05'), 409, 'too_late');
+  expectError(await away('2026-10-04'), 409, 'too_late');
+  assert.deepEqual((await away('2026-10-06')).body.away, [{ day: '2026-10-06', reason: 'Trip' }]);
+  assert.equal((await away('2026-10-06', true, 'Other', 'other')).status, 200);
+  assert.deepEqual((await away('2026-10-06', true, 'Appointment')).body.away,
+    [{ day: '2026-10-06', reason: 'Appointment' }]);
+  assert.deepEqual((await away('2026-10-06', false)).body.away, []);
+  at('03:00', '2026-10-06'); // Still the October 5 routine day.
+  assert.equal((await away('2026-10-06')).status, 200);
+  at('12:00', '2026-10-06');
+  expectError(await away('2026-10-06'), 409, 'too_late');
+  at('12:00', '2026-10-07');
+  assert.deepEqual((await call('GET', '/api/routine')).body.away, []);
+});
+
+for (const route of ['/api/routine', '/api/keepout', '/api/me', '/api/watch', '/api/board']) {
+  test(`${route} does not write the plan or status on an away day`, async (t) => {
+    const { enable, call, status, DB, at } = setup(t, '12:00');
+    await enable();
+    await call('PUT', '/api/visibility', { visibility: 'public' });
+    await call('PUT', '/api/routine/away', { day: '2026-10-06', away: true, reason: 'Trip' });
+    await status('done', '12:00-12:20');
+    const plan = DB.raw.prepare('SELECT schedule, anchor FROM people WHERE sub = ?').get('owner');
+    const statuses = DB.raw.prepare('SELECT * FROM routine_status').all();
+    at('12:00', '2026-10-06');
+    await call('GET', route, undefined, route === '/api/board' ? 'viewer' : 'owner');
+    assert.deepEqual((await call('GET', '/api/keepout')).body,
+      { now: Date.now(), day: '2026-10-06', keepout: null });
+    assert.equal(await (await keepoutResponse(DB)).text(), '');
+    assert.deepEqual(DB.raw.prepare('SELECT schedule, anchor FROM people WHERE sub = ?').get('owner'), plan);
+    assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-05');
+    expectError(await status('done', '12:00-12:20', '2026-10-06'), 409, 'not_due');
+    expectError(await status('start', '12:30..14:00', '2026-10-06'), 409, 'not_open');
+    assert.deepEqual(DB.raw.prepare('SELECT * FROM routine_status').all(), statuses);
+    const clear = await call('PUT', '/api/routine/away', { day: '2026-10-06', away: false, reason: '' });
+    assert.equal(clear.status, 200);
+    assert.equal(clear.body.today.keepout.key, '12:00-12:20');
+    assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-06');
+    at('12:00', '2026-10-07');
+    assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00-12:20');
+  });
+}
+
+
+test('routine materialization preserves moments in the profile, board and watch payload', async (t) => {
+  const { enable, call } = setup(t, '12:00');
+  assert.equal((await enable(DEFAULT_ROUTINE)).status, 200);
+  const profile = (await call('GET', '/api/me')).body;
+  assert.deepEqual(profile.schedule.text.split('\n').slice(0, 2),
+    ['12:00 wake up', '12:00-12:30 wash face, brush teeth']);
+  const watch = (await call('GET', '/api/watch')).body.items;
+  assert.deepEqual(watch[0], [instant('12:00') / 1000, instant('12:00') / 1000, 'wake up']);
+  assert.deepEqual(watch[1], [instant('12:00') / 1000, instant('12:30') / 1000, 'wash face, brush teeth']);
+  const board = (await call('GET', '/api/board')).body.people[0].items;
+  assert.equal(board.length, 8);
+  assert.deepEqual(board[0], { start: instant('12:00'), end: instant('12:00'), name: 'wake up' });
+  assert.deepEqual(board[1], { start: instant('12:00'), end: instant('12:30'), name: 'wash face, brush teeth' });
 });

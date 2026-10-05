@@ -136,7 +136,7 @@ function render() {
     const isKeepoutNow = keepout?.key === item.key;
     const row = node('li', `routine-item is-${item.phase}${item.key === current ? ' is-now' : ''}`);
     const times = node('div', 'routine-item-time');
-    times.append(node('span', '', `${clock(item.start)}–${clock(item.end)}`));
+    times.append(node('span', '', item.end > item.start ? `${clock(item.start)}–${clock(item.end)}` : clock(item.start)));
     const details = node('div', 'routine-item-details');
     details.append(node('span', 'routine-item-name', item.name));
     if (isKeepoutNow) {
