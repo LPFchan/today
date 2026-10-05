@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: 2026-10-05
+- Last updated: 2026-10-06
 - Overall posture: `active`
 - Current focus: first real use by the operator and marie, on the web, the watch and the Mac
 - Highest-priority blocker: none
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-06:
+  - Change: private wake/photo/away proofs and collector eligibility are deployed; D1 migration 0005 is applied. Live bearer checks return null eligibility while the operator's routine is off and reject malformed proofs. Common Auth's proof route is reachable.
+  - Why it matters: accepted proofs can satisfy routine conditions independently. Mac proof-aware alarm and unlock instructions compile and pass CI, but are not distributed in a new release. Meal ingestion, private home verification, cleaning completion reporting and Hermes bypass/off remain activation gates; Done remains the temporary override.
 
 - 2026-10-05:
   - Change: phase 4 ships. The routine opens with `12:00 wake up` and `12:00 wash face, brush teeth`; mac-v2.1.0 rings Radial (20%→50% in 5 s) until wake up is done; brief rings dumpling when the Air can't; a 21:00 Hermes job marks calendar days off (`PUT /api/routine/away`).
@@ -67,12 +71,6 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
   - Related ids: DEC-20260923-001
 
 ## Active Blockers And Risks
-
-- The Mac mini's Command Line Tools can't build Swift (duplicate `SwiftBridging` module).
-  - Effect: the Mac app builds only on CI.
-  - Owner: operator
-  - Mitigation: reinstall the Command Line Tools (needs sudo).
-  - Related ids: none
 
 - Hangul on the watch.
   - Effect: Korean names show as boxes on stock firmware without a language pack.

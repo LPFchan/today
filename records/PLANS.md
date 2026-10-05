@@ -51,8 +51,11 @@ before it binds.
 
 - Phase 5 — proofs in brief:
   - Why now: item status and the alarm are in place; proofs are the next way out of a lock.
-  - Dependencies: phase 1; findmy-mcp on dumpling; an auth gateway route and
-    service credential that let brief write proof results for the operator.
+  - Available foundation: Today proof storage/eligibility and the Common Auth
+    bearer proof route are deployed; Find My is reachable on dumpling.
+  - Remaining dependencies: verify the private home mapping, connect meal-photo
+    ingestion and private nutrition logging, and report vacuum completion.
+    Mac proof-aware source also needs an operator-approved release before distribution.
   - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
     calorie estimate); 30+ minutes away from home via Find My; results posted
     to today to lift the lock. When Find My sees the operator leave home for
