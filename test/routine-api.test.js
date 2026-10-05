@@ -75,7 +75,7 @@ test('opted-out users retain their profile, board and watch; routine reads write
   assert.deepEqual((await call('GET', '/api/routine')).body, {
     enabled: false, text: DEFAULT_ROUTINE, pendingFrom: null, tz: 'Asia/Seoul', today: null,
   });
-  assert.deepEqual((await call('GET', '/api/keepout')).body, { now: Date.now(), keepout: null });
+  assert.deepEqual((await call('GET', '/api/keepout')).body, { now: Date.now(), day: null, keepout: null });
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM people').get().n, 0);
   const initial = await call('GET', '/api/me');
   assert.deepEqual(initial.body, {
@@ -414,7 +414,9 @@ test('an 11:00 edit moving the first start from 12:00 to 10:00 cannot erase the 
   assert.equal(saved.body.text, revised);
   assert.equal(saved.body.pendingFrom, '2026-10-07');
   assert.deepEqual(saved.body.today, before);
-  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '03:00-12:00');
+  const overnight = (await call('GET', '/api/keepout')).body;
+  assert.equal(overnight.keepout.key, '03:00-12:00');
+  assert.match(overnight.day, /^\d{4}-\d{2}-\d{2}$/);
   assert.deepEqual((await call('GET', '/api/me')).body.schedule, expectedSchedule(original, '11:00', '2026-10-06'));
   assert.equal(DB.raw.prepare('SELECT text FROM routines').get().text, original);
   at('12:00', '2026-10-06');
