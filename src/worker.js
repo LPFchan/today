@@ -90,6 +90,13 @@ async function api(request, env, url) {
     case 'GET /api/keepout': {
       const now = Date.now();
       const routine = await currentRoutine(env, me, now);
+      // Harness hooks ask for one plain line: empty when free.
+      if (request.headers.get('accept')?.includes('text/plain')) {
+        return new Response(keepoutText(routine), {
+          status: 200,
+          headers: { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' },
+        });
+      }
       // `day` is what start and done expect alongside the item key.
       return json(200, { now, day: routine.today?.day ?? null, keepout: routine.today?.keepout ?? null });
     }
@@ -421,6 +428,20 @@ function truncateUtf8(text, maxBytes) {
 }
 
 /* ---------- helpers ---------- */
+
+function keepoutText(routine) {
+  const keepout = routine.today?.keepout;
+  if (!keepout) return '';
+  const name = keepout.name.replace(/\s+/g, ' ').trim();
+  // Temporary: Done is the only proof that works until proofs land.
+  if (keepout.needs.length) return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
+  if (!keepout.until) return `today keepout: ${name}.\n`;
+  const time = new Intl.DateTimeFormat('en-CA', {
+    timeZone: routine.row?.tz ?? DEFAULT_PLACE.tz,
+    hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+  }).format(keepout.until);
+  return `today keepout: ${name} until ${time}. try again then.\n`;
+}
 
 function json(status, value) {
   return new Response(JSON.stringify(value), {

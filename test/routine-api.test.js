@@ -53,6 +53,67 @@ function expectError(response, status, error) {
   assert.deepEqual(response, { status, body: { error } });
 }
 
+function keepoutResponse(DB, accept = 'text/plain', sub = 'owner') {
+  const headers = sub === null ? {} : as(sub);
+  if (accept !== null) headers.accept = accept;
+  return worker.fetch(new Request(ORIGIN + '/api/keepout', { headers }), { DB });
+}
+
+test('plain-text keepout is empty when opted out or enabled and free', async (t) => {
+  const { DB, enable } = setup(t);
+  for (const enabled of [false, true]) {
+    if (enabled) await enable('12:00-13:00 Free');
+    const response = await keepoutResponse(DB);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'text/plain; charset=utf-8');
+    assert.equal(await response.text(), '');
+  }
+});
+
+test('plain-text time locks use HH:MM in the routine timezone', async (t) => {
+  const { DB, enable, at } = setup(t, '03:00');
+  await enable('00:00-12:00 sleep !');
+  // The API stores the zone on the routine row; UTC differs from the test clock's Seoul zone.
+  DB.raw.prepare('UPDATE routines SET tz = ? WHERE sub = ?').run('UTC', 'owner');
+  at('12:30');
+  const response = await keepoutResponse(DB);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get('content-type'), 'text/plain; charset=utf-8');
+  assert.equal(await response.text(), 'today keepout: sleep until 12:00. try again then.\n');
+});
+
+// Done unlocks every proof until proofs land.
+for (const needs of ['done', 'wake', 'photo', 'away 30m', 'wake, done, photo, away 30m']) {
+  test(`plain-text action lock (${needs}) points at Done`, async (t) => {
+    const { DB, enable } = setup(t, '12:00');
+    await enable(`12:00-12:20 wash face, brush teeth ! until ${needs}`);
+    const response = await keepoutResponse(DB);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'text/plain; charset=utf-8');
+    assert.equal(await response.text(), 'today keepout: wash face, brush teeth. mark it done on today.lost.plus to unlock.\n');
+  });
+}
+
+test('keepout stays JSON unless Accept asks for text/plain', async (t) => {
+  const { DB, enable } = setup(t, '12:00');
+  const enabled = await enable();
+  for (const accept of [null, '*/*', 'application/json']) {
+    const response = await keepoutResponse(DB, accept);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+    assert.deepEqual(await response.json(), { now: Date.now(), day: '2026-10-05', keepout: enabled.body.today.keepout });
+  }
+  assert.equal((await keepoutResponse(DB, 'text/plain')).headers.get('content-type'), 'text/plain; charset=utf-8');
+});
+
+test('plain-text Accept leaves authentication errors as JSON', async (t) => {
+  const { DB } = setup(t);
+  const response = await keepoutResponse(DB, 'text/plain', null);
+  assert.equal(response.status, 401);
+  assert.equal(response.headers.get('content-type'), 'application/json; charset=utf-8');
+  assert.deepEqual(await response.json(), { error: 'unauthenticated' });
+});
+
 test('routine routes require gateway identity and reject malformed writes', async (t) => {
   const { call, DB } = setup(t);
   for (const [method, path] of [
