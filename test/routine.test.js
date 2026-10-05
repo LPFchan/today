@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_PLACE, DEFAULT_ROUTINE, MAX_LINES, MAX_NAME, RoutineError,
   parseRoutine, sunsetMinutes, zonedMidnight, zonedDate, placeRoutine,
-  routineDay, routineSchedule, keepoutState, itemPhase, remainingNeeds,
+  routineDay, routineSchedule, keepoutState, itemPhase, remainingNeeds, progress, reportInstance,
 } from '../public/routine.js';
 import { parseSchedule, absoluteItems, serializeSchedule } from '../public/schedule.js';
 
@@ -20,6 +20,42 @@ const code = (fn) => {
 const ny = { tz: 'America/New_York', lat: 40.7128, lon: -74.006 };
 const makeDay = (text, date = '2026-10-05', place = DEFAULT_PLACE) => placeRoutine(parseRoutine(text, place), date, place);
 const at = (day, hours, minutes = 0) => day.anchor + (hours * 60 + minutes) * MINUTE;
+
+test('bypass pins one proof item/day, preserves proofs and ignores minimum duration', () => {
+  const day = makeDay('12:30..14:00 Meal ! until photo; min 20m\n03:00-12:00 Sleep !');
+  const item = day.items[0];
+  const timestamp = at(day, 13);
+  const status = { proofs: { photo: { at: timestamp, note: 'Real proof' } },
+    bypass: { day: day.day, key: item.key, at: timestamp } };
+  assert.equal(progress(day, item, status, timestamp).bypassed, true);
+  assert.equal(itemPhase(day, item, status, timestamp), 'bypassed');
+  assert.equal(status.proofs.photo.note, 'Real proof');
+  for (const change of [{ day: '2026-10-04' }, { key: 'other' }, { at: day.ends },
+    { at: at(day, 12) }, { at: timestamp + 1 }]) {
+    assert.equal(progress(day, item, { ...status, bypass: { ...status.bypass, ...change } }, timestamp).bypassed, false);
+  }
+  const sleep = day.items[1];
+  assert.equal(progress(day, sleep, { bypass: { day: day.day, key: sleep.key, at: sleep.start } }, sleep.start).bypassed, false);
+  assert.equal(keepoutState(day, { [item.key]: status }, sleep.start).key, sleep.key);
+});
+
+test('report separates late completion, bypass, unknown data and off releases', () => {
+  const day = makeDay('12:30..14:00 Meal ! until photo');
+  const item = day.items[0];
+  const snapshot = { day, statuses: {}, observedAt: at(day, 13), stoppedAt: null, away: false };
+  assert.equal(reportInstance(snapshot)[0].outcome, 'missed');
+  assert.equal(reportInstance({ ...snapshot, observedAt: at(day, 15) })[0].missedDeadline, null);
+  const late = { [item.key]: { proofs: { photo: { at: at(day, 15), note: '' } } } };
+  const result = reportInstance({ ...snapshot, statuses: late, observedAt: at(day, 16) })[0];
+  assert.equal(result.outcome, 'done');
+  assert.equal(result.missedDeadline, true);
+  const bypass = { [item.key]: { bypass: { day: day.day, key: item.key, at: at(day, 13) } } };
+  assert.equal(reportInstance({ ...snapshot, statuses: bypass })[0].missedDeadline, false);
+  const off = reportInstance({ ...snapshot, stoppedAt: at(day, 13) })[0];
+  assert.equal(off.outcome, 'released');
+  assert.equal(off.missedDeadline, false);
+  assert.equal(reportInstance({ ...snapshot, away: true })[0].outcome, 'skipped');
+});
 
 test('unlock requirements exclude accepted proofs and preserve Done', () => {
   assert.deepEqual(remainingNeeds({ needs: ['away', 'photo'], have: ['away'] }), ['photo']);

@@ -18,7 +18,7 @@ import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
   DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
-  parseRoutine, placeRoutine, progress, routineDay, routineSchedule, zonedDate,
+  parseRoutine, placeRoutine, progress, reportInstance, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -91,6 +91,12 @@ async function api(request, env, url) {
       return routineStatus(request, env, me, 'done');
     case 'POST /api/routine/proof':
       return routineProof(request, env, me);
+    // Gateway MUST route this exact POST as mcp (machine credentials only,
+    // today scope/visibility). The shared token does not identify Hermes.
+    case 'POST /api/routine/affordance':
+      return routineAffordance(request, env, me);
+    case 'GET /api/routine/report':
+      return routineReport(env, me, url);
     case 'GET /api/keepout': {
       const now = Date.now();
       const routine = await currentRoutine(env, me, now);
@@ -230,6 +236,7 @@ async function currentRoutine(env, me, now = Date.now()) {
   const away = await env.DB.prepare('SELECT day FROM routine_away WHERE sub = ?1 AND day = ?2')
     .bind(me.sub, day.day).first();
   if (away) {
+    await observeRoutine(env, me.sub, row, day, now, true);
     result.today = { day: day.day, items: [], keepout: null };
     return result;
   }
@@ -257,12 +264,25 @@ async function currentRoutine(env, me, now = Date.now()) {
       result.materialized = true;
     }
   }
+  const fresh = await savedRoutine(env, me.sub);
+  if (fresh.text !== row.text || fresh.enabled !== row.enabled || fresh.instance !== row.instance
+      || fresh.enabled_at !== row.enabled_at
+      || fresh.tz !== row.tz || fresh.lat !== row.lat || fresh.lon !== row.lon) {
+    return currentRoutine(env, me, now);
+  }
+  row = fresh;
+  result.row = row;
+  await observeRoutine(env, me.sub, row, day, now, false);
   const { results } = await env.DB.prepare(
     'SELECT key, started_at, done_at, proofs FROM routine_status WHERE sub = ?1 AND day = ?2',
   ).bind(me.sub, day.day).all();
   const statuses = Object.fromEntries(results.map((status) => [status.key, {
     startedAt: status.started_at, doneAt: status.done_at, proofs: JSON.parse(status.proofs),
   }]));
+  const { results: bypasses } = await env.DB.prepare(
+    "SELECT day, key, at, reason FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND instance = ?3 AND action = 'bypass'",
+  ).bind(me.sub, day.day, row.instance).all();
+  for (const bypass of bypasses) statuses[bypass.key] = { ...statuses[bypass.key], bypass };
   result.day = day;
   result.statuses = statuses;
   result.today = {
@@ -272,10 +292,171 @@ async function currentRoutine(env, me, now = Date.now()) {
       doneAt: statuses[item.key]?.doneAt ?? null,
       proofs: progress(day, item, statuses[item.key], now).proofs,
       phase: itemPhase(day, item, statuses[item.key], now),
+      ...(statuses[item.key]?.bypass ? { bypass: statuses[item.key].bypass } : {}),
     })),
     keepout: keepoutState(day, statuses, now),
   };
   return result;
+}
+
+// Seven elapsed days, pruned per subject on routine observation/report reads.
+const REPORT_KEEP_MS = 7 * DAY_MS;
+
+async function trimRoutineHistory(env, sub, now) {
+  await env.DB.prepare('DELETE FROM routine_days WHERE sub = ?1 AND ends < ?2')
+    .bind(sub, now - REPORT_KEEP_MS).run();
+  await env.DB.prepare('DELETE FROM routine_affordances WHERE sub = ?1 AND at < ?2 AND NOT EXISTS ' +
+    '(SELECT 1 FROM routine_days WHERE sub = ?1 AND day = routine_affordances.day)')
+    .bind(sub, now - REPORT_KEEP_MS).run();
+}
+
+async function observeRoutine(env, sub, row, day, now, away) {
+  // INSERT SELECT copies progress inside the same statement as the snapshot.
+  // A first observation after a deadline cannot establish a known miss.
+  await env.DB.prepare(
+    'INSERT INTO routine_days (sub, day, enabled_at, observed_at, ends, data, statuses, instance) ' +
+      'SELECT ?1, ?2, ?3, ?4, ?5, ?6, COALESCE((SELECT json_group_object(key, json_object(' +
+      "'startedAt', started_at, 'doneAt', done_at, 'proofs', json(proofs))) FROM routine_status " +
+      'WHERE sub = ?1 AND day = ?2), \'{}\'), instance FROM routines WHERE sub = ?1 AND enabled = 1 AND revision = ?7 ' +
+      'ON CONFLICT (sub, day, instance) DO UPDATE SET data = excluded.data, observed_at = excluded.observed_at, ' +
+      "statuses = excluded.statuses WHERE json_extract(routine_days.data, '$.away') = 1 AND json_extract(excluded.data, '$.away') = 0",
+  ).bind(sub, day.day, row.enabled_at, now, day.ends, JSON.stringify({ day, away }), row.revision).run();
+  await trimRoutineHistory(env, sub, now);
+}
+
+function validDay(day) {
+  if (typeof day !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  const epoch = Date.parse(`${day}T00:00:00Z`);
+  return Number.isFinite(epoch) && new Date(epoch).toISOString().slice(0, 10) === day;
+}
+
+function affordanceReceipt(row) {
+  return { requestId: row.request_id, action: row.action, day: row.day,
+    key: row.key, reason: row.reason, at: row.at, instance: row.instance };
+}
+
+/** POST /api/routine/affordance contract (gateway: exact mcp route, today scope).
+ * Request: {action:'bypass'|'off', day:'YYYY-MM-DD', key?:string,
+ *   reason:string, requestId:UUID}. Bypass requires key (1..100 UTF-16 units);
+ * off omits key. Reason is nonblank, <=200 Unicode code points. No extra fields.
+ * 200: {receipt:{requestId,action,day,key:string|null,reason,at:epochMs,instance}}.
+ * Receipts are first-write, subject-scoped and stable across rollover/off.
+ * 400 bad_request; 401 unauthenticated; 409 not_due|locked|state_changed|
+ * request_conflict. A state_changed rejection creates no receipt; re-read state.
+ * Browser denial belongs to the gateway. Neither identity nor this shared token
+ * identifies Hermes; the worker does not inspect stripped credentials.
+ */
+async function routineAffordance(request, env, me) {
+  const body = await request.json().catch(() => null);
+  if (!body || Array.isArray(body) || !['bypass', 'off'].includes(body.action) || !validDay(body.day)
+      || typeof body.reason !== 'string' || !body.reason.trim() || [...body.reason].length > 200
+      || typeof body.requestId !== 'string'
+      || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
+      || (body.action === 'bypass' && (typeof body.key !== 'string' || !body.key || body.key.length > 100))
+      || (body.action === 'off' && Object.hasOwn(body, 'key'))
+      || Object.keys(body).some((key) => !['action', 'day', 'key', 'reason', 'requestId'].includes(key))) {
+    return json(400, { error: 'bad_request' });
+  }
+  const requestId = body.requestId.toLowerCase();
+  const key = body.action === 'bypass' ? body.key : null;
+  const payload = JSON.stringify({ action: body.action, day: body.day, key, reason: body.reason });
+  const readReceipt = () => env.DB.prepare('SELECT * FROM routine_affordances WHERE sub = ?1 AND request_id = ?2')
+    .bind(me.sub, requestId).first();
+  const receiptResponse = (receipt) => receipt.payload === payload
+    ? json(200, { receipt: affordanceReceipt(receipt) }) : json(409, { error: 'request_conflict' });
+  const previous = await readReceipt();
+  if (previous) return receiptResponse(previous);
+  const routine = await currentRoutine(env, me, Date.now());
+  const now = Date.now();
+  if (!routine.row?.enabled || !routine.day || body.day !== routine.day.day || now >= routine.day.ends) {
+    return json(409, { error: 'not_due' });
+  }
+  if (body.action === 'bypass') {
+    if (!routine.statuses) return json(409, { error: 'not_due' });
+    const item = routine.day.items.find((entry) => entry.key === key);
+    if (!item?.keepout || !item.until.length) return json(409, { error: 'not_due' });
+    const lock = keepoutState(routine.day, routine.statuses, now);
+    if (lock && lock.key !== key) return json(409, { error: 'locked' });
+    const phase = itemPhase(routine.day, item, routine.statuses[key], now);
+    if (phase !== 'locked' && !(phase === 'open' && item.kind === 'window')) {
+      return json(409, { error: 'not_due' });
+    }
+  }
+  // Revision changes on every relevant state write. Eligibility evaluated above
+  // remains valid only if that entire state is unchanged at transaction time.
+  const insert = env.DB.prepare(
+    'INSERT OR IGNORE INTO routine_affordances ' +
+      '(sub, request_id, payload, action, day, key, reason, at, enabled_at, instance) ' +
+      'SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, enabled_at, instance FROM routines ' +
+      'WHERE sub = ?1 AND enabled = 1 AND revision = ?9 AND enabled_at = ?10',
+  ).bind(me.sub, requestId, payload, body.action, body.day, key, body.reason, now,
+    routine.row.revision, routine.row.enabled_at);
+  const statements = [insert];
+  if (body.action === 'off') {
+    // The event, stop boundary and off switch commit together, or not at all.
+    const accepted = 'EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND request_id = ?2 ' +
+      'AND payload = ?3 AND at = ?4 AND instance = ?5) ' +
+      'AND EXISTS (SELECT 1 FROM routines WHERE sub = ?1 AND revision = ?7)';
+    statements.push(
+      env.DB.prepare('UPDATE routine_days SET stopped_at = ?4 WHERE sub = ?1 AND day = ?6 ' +
+        `AND instance = ?5 AND stopped_at IS NULL AND ${accepted}`)
+        .bind(me.sub, requestId, payload, now, routine.row.instance, body.day, routine.row.revision + 1),
+      env.DB.prepare(`UPDATE routines SET enabled = 0, updated_at = ?4 WHERE sub = ?1 AND instance = ?5 AND ${accepted}`)
+        .bind(me.sub, requestId, payload, now, routine.row.instance, body.day, routine.row.revision + 1),
+    );
+  }
+  const [written] = await env.DB.batch(statements);
+  const receipt = await readReceipt();
+  if (receipt) return receiptResponse(receipt);
+  return json(409, { error: written.meta.changes ? 'not_due' : 'state_changed' });
+}
+
+/** GET /api/routine/report?day=YYYY-MM-DD contract (gateway: api, today scope).
+ * 200: {day, completed:true|null, coverage:'complete'|'partial'|'missing',
+ *   instances:[{instance,enabledAt,observedAt,starts,ends,stoppedAt:number|null,
+ *     away:boolean,items:[{key,name,deadline,outcome,missedDeadline,
+ *       proofs?:{[proof]:{at,note}},doneAt?:number|null}]}],
+ *   missed:[{...item,instance}], events:[receipt]}.
+ * Outcomes: skipped|released|bypassed|done|missed|unknown; missedDeadline is
+ * boolean|null (null means insufficient evidence). All times are epoch ms.
+ * complete describes data coverage, not successful completion of all items.
+ * No snapshot: completed:null, coverage:missing, empty arrays; never a miss.
+ * 400 bad_request; 401 unauthenticated; 409 day_incomplete (original ends).
+ * History is observed only, retained seven elapsed days after instance ends;
+ * associated receipts remain until their snapshots expire. No backfilling.
+ */
+async function routineReport(env, me, url) {
+  const date = url.searchParams.get('day');
+  if (!validDay(date)) return json(400, { error: 'bad_request' });
+  const now = Date.now();
+  const current = await currentRoutine(env, me, now);
+  await trimRoutineHistory(env, me.sub, now);
+  const { results: rows } = await env.DB.prepare(
+    'SELECT * FROM routine_days WHERE sub = ?1 AND day = ?2 ORDER BY instance',
+  ).bind(me.sub, date).all();
+  if (rows.some((row) => row.ends > now) || (!rows.length && date >= currentRoutineDay(current, now))) {
+    return json(409, { error: 'day_incomplete' });
+  }
+  const { results: events } = await env.DB.prepare(
+    'SELECT * FROM routine_affordances WHERE sub = ?1 AND day = ?2 ORDER BY at, request_id',
+  ).bind(me.sub, date).all();
+  const instances = rows.map((row) => {
+    const data = JSON.parse(row.data);
+    const statuses = JSON.parse(row.statuses);
+    for (const event of events) if (event.action === 'bypass' && event.instance === row.instance) {
+      statuses[event.key] = { ...statuses[event.key], bypass: affordanceReceipt(event) };
+    }
+    return { instance: row.instance, enabledAt: row.enabled_at, observedAt: row.observed_at,
+      starts: data.day.items[0].start, ends: row.ends, stoppedAt: row.stopped_at,
+      away: data.away,
+      items: reportInstance({ ...data, statuses, observedAt: row.observed_at, stoppedAt: row.stopped_at }) };
+  });
+  const items = instances.flatMap((instance) => instance.items.map((item) => ({ ...item, instance: instance.instance })));
+  return json(200, { day: date, completed: rows.length ? true : null,
+    coverage: !rows.length ? 'missing'
+      : items.some((item) => item.outcome === 'unknown' || item.missedDeadline === null) ? 'partial' : 'complete',
+    instances, missed: items.filter((item) => item.outcome === 'missed' || item.missedDeadline === true),
+    events: events.map(affordanceReceipt) });
 }
 
 function routineValue(routine) {
@@ -398,15 +579,17 @@ async function routineStatus(request, env, me, action) {
     const lock = routine.today.keepout;
     if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
     if (status?.startedAt != null || status?.doneAt != null
-        || progress(routine.day, item, status, now).done) return json(409, { error: 'already' });
+        || progress(routine.day, item, status, now).done
+        || progress(routine.day, item, status, now).bypassed) return json(409, { error: 'already' });
     if (!item.keepout || item.kind !== 'window' || now < item.start || now >= item.end) {
       return json(409, { error: 'not_open' });
     }
     const written = await env.DB.prepare(
-      'INSERT INTO routine_status (sub, day, key, started_at) VALUES (?1, ?2, ?3, ?4) ' +
+      'INSERT INTO routine_status (sub, day, key, started_at) SELECT ?1, ?2, ?3, ?4 ' +
+        routineWriteGuard(5, 6) + ' ' +
         'ON CONFLICT (sub, day, key) DO UPDATE SET started_at = ?4 ' +
         'WHERE started_at IS NULL AND done_at IS NULL',
-    ).bind(me.sub, body.day, body.key, now).run();
+    ).bind(me.sub, body.day, body.key, now, routine.row.instance, routine.row.text).run();
     if (!written.meta.changes) return json(409, { error: 'already' });
   } else {
     const lock = routine.today.keepout;
@@ -418,12 +601,21 @@ async function routineStatus(request, env, me, action) {
       return json(409, { error: 'not_due' });
     }
     if (!early && now < lock.doneAfter) return json(409, { error: 'too_soon' });
-    await env.DB.prepare(
-      'INSERT INTO routine_status (sub, day, key, done_at) VALUES (?1, ?2, ?3, ?4) ' +
-        'ON CONFLICT (sub, day, key) DO UPDATE SET done_at = ?4',
-    ).bind(me.sub, body.day, body.key, now).run();
+    const written = await env.DB.prepare(
+      'INSERT INTO routine_status (sub, day, key, done_at) SELECT ?1, ?2, ?3, ?4 ' +
+        routineWriteGuard(5, 6) + ' ' +
+        'ON CONFLICT (sub, day, key) DO UPDATE SET done_at = COALESCE(done_at, ?4)',
+    ).bind(me.sub, body.day, body.key, now, routine.row.instance, routine.row.text).run();
+    if (!written.meta.changes) return json(409, { error: 'state_changed' });
   }
   return json(200, await routineProfile(env, me));
+}
+
+function routineWriteGuard(instance, text) {
+  return 'FROM routines WHERE sub = ?1 AND enabled = 1 AND materialized_day = ?2 ' +
+    `AND instance = ?${instance} AND text = ?${text} ` +
+    'AND NOT EXISTS (SELECT 1 FROM routine_away WHERE sub = ?1 AND day = ?2) ' +
+    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass')";
 }
 
 /** Select the current proof-bearing item without skipping an earlier lock. */
@@ -460,10 +652,11 @@ async function routineProof(request, env, me) {
   if (!item.keepout || !item.until.includes(body.proof)) return json(409, { error: 'not_needed' });
   const status = routine.statuses[item.key];
   const p = progress(routine.day, item, status, now);
+  if (p.bypassed) return json(409, { error: 'not_due' });
   const response = async () => {
     const updated = await routineProfile(env, me);
-    return json(200, { ...updated, item: updated.today.items.find((entry) => entry.key === item.key),
-      keepout: updated.today.keepout });
+    return json(200, { ...updated, item: updated.today?.items.find((entry) => entry.key === item.key) ?? null,
+      keepout: updated.today?.keepout ?? null });
   };
   // Retrying an accepted proof preserves its first timestamp and note, even after completion.
   if (Object.hasOwn(p.proofs, body.proof)) return response();
@@ -474,12 +667,19 @@ async function routineProof(request, env, me) {
   if (!early && now < p.doneAfter) return json(409, { error: 'too_soon' });
   // Merge in SQL so simultaneous different proofs cannot overwrite each other.
   // The WHERE also makes retries preserve the original proof.
-  await env.DB.prepare(
-    'INSERT INTO routine_status (sub, day, key, proofs) VALUES (?1, ?2, ?3, json_object(?4, json(?5))) ' +
+  const written = await env.DB.prepare(
+    'INSERT INTO routine_status (sub, day, key, proofs) SELECT ?1, ?2, ?3, json_object(?4, json(?5)) ' +
+      routineWriteGuard(7, 8) + ' ' +
       'ON CONFLICT (sub, day, key) DO UPDATE SET proofs = json_set(proofs, ?6, json(?5)) ' +
       'WHERE json_extract(proofs, ?6) IS NULL',
   ).bind(me.sub, routine.day.day, item.key, body.proof,
-    JSON.stringify({ at: now, note: body.note ?? '' }), `$.${body.proof}`).run();
+    JSON.stringify({ at: now, note: body.note ?? '' }), `$.${body.proof}`,
+    routine.row.instance, routine.row.text).run();
+  if (!written.meta.changes) {
+    const row = await env.DB.prepare('SELECT proofs FROM routine_status WHERE sub = ?1 AND day = ?2 AND key = ?3')
+      .bind(me.sub, routine.day.day, item.key).first();
+    if (!row || !Object.hasOwn(JSON.parse(row.proofs), body.proof)) return json(409, { error: 'state_changed' });
+  }
   return response();
 }
 

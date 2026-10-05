@@ -118,7 +118,7 @@ function nowKey() {
   const today = routine.today;
   if (today?.keepout) return today.keepout.key;
   const now = Date.now();
-  return today?.items.find((item) => item.phase !== 'done' && item.start <= now && now < item.end)?.key ?? null;
+  return today?.items.find((item) => !['done', 'bypassed'].includes(item.phase) && item.start <= now && now < item.end)?.key ?? null;
 }
 
 function render() {
@@ -156,10 +156,10 @@ function render() {
       details.append(status);
     } else if (item.phase !== 'done' && item.phase !== 'past') {
       const status = node('div', 'routine-item-status');
-      if (item.phase === 'locked' || item.phase === 'missed') {
+      if (['locked', 'missed', 'bypassed'].includes(item.phase)) {
         status.append(node('span', '', t(`routinePhase_${item.phase}`)));
       }
-      if (item.keepout) {
+      if (item.keepout && item.phase !== 'bypassed') {
         const beforeLock = item.phase === 'upcoming' || item.phase === 'open';
         status.append(node('span', 'routine-tag', t('routineKeepout')));
         if (beforeLock) {
