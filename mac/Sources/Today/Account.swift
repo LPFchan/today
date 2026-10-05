@@ -164,29 +164,36 @@ enum Account {
     /// Hold the queue through refresh, save, request and the one retry.
     private static func authorized(_ path: String, body: Data? = nil) async throws -> Data {
         try await requests.run {
-            guard var tokens = TokenStore.load() else { throw Failure.signedOut }
-            if tokens.expires < Date().addingTimeInterval(60) { tokens = try await refreshed(tokens) }
-            var request = URLRequest(url: base.appending(path: path))
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            if let body {
-                request.httpMethod = "POST"
-                request.httpBody = body
-                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            }
-            request.setValue("Bearer \(tokens.access)", forHTTPHeaderField: "Authorization")
-            var (data, status) = try await send(request)
-            if status == 401 {
-                tokens = try await refreshed(tokens)
+            do {
+                guard var tokens = TokenStore.load() else { throw Failure.signedOut }
+                if tokens.expires < Date().addingTimeInterval(60) { tokens = try await refreshed(tokens) }
+                var request = URLRequest(url: base.appending(path: path))
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                if let body {
+                    request.httpMethod = "POST"
+                    request.httpBody = body
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                }
                 request.setValue("Bearer \(tokens.access)", forHTTPHeaderField: "Authorization")
-                (data, status) = try await send(request)
+                var (data, status) = try await send(request)
+                if status == 401 {
+                    tokens = try await refreshed(tokens)
+                    request.setValue("Bearer \(tokens.access)", forHTTPHeaderField: "Authorization")
+                    (data, status) = try await send(request)
+                }
+                if status == 401 { throw Failure.signedOut }
+                if status == 409 {
+                    struct Conflict: Decodable { let error: String }
+                    throw Failure.conflict(try JSONDecoder().decode(Conflict.self, from: data).error)
+                }
+                guard status == 200 else { throw Failure.server(status) }
+                return data
+            } catch Failure.signedOut {
+                // Clear rejected credentials and their lock before releasing the queue.
+                TokenStore.clear()
+                KeepoutStore.clear()
+                throw Failure.signedOut
             }
-            if status == 401 { throw Failure.signedOut }
-            if status == 409 {
-                struct Conflict: Decodable { let error: String }
-                throw Failure.conflict(try JSONDecoder().decode(Conflict.self, from: data).error)
-            }
-            guard status == 200 else { throw Failure.server(status) }
-            return data
         }
     }
 

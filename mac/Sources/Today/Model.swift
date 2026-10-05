@@ -90,12 +90,14 @@ final class Model {
             now = Date()
             enforcing = UserDefaults.standard.bool(forKey: "enforcing")
             // Restore the cover before polling, including after an offline relaunch.
-            if let reply = KeepoutStore.load(), let lock = reply.keepout {
+            if session == .signedIn, let reply = KeepoutStore.load(), let lock = reply.keepout {
                 savedKeepout = reply
                 keepout = lock
                 keepoutDay = reply.day
                 enforcing = true
                 UserDefaults.standard.set(true, forKey: "enforcing")
+            } else if session == .signedOut {
+                KeepoutStore.clear()
             }
             LoginItem.migrate()
             syncLoginItem()
@@ -182,9 +184,7 @@ final class Model {
                 problem = nil
             } catch Account.Failure.signedOut {
                 guard current == generation else { return }
-                if keepout == nil { session = .signedOut }
-                people = []
-                problem = Account.Failure.signedOut.localizedDescription
+                authenticationExpired()
             } catch {
                 guard current == generation else { return }
                 // Keep showing the last board; the timers are still right.
@@ -228,6 +228,9 @@ final class Model {
                     finishProblem = error.localizedDescription
                 }
             }
+        } catch Account.Failure.signedOut {
+            guard current == generation else { return }
+            authenticationExpired()
         } catch {
             guard current == generation else { return }
             finishProblem = error.localizedDescription
@@ -253,6 +256,10 @@ final class Model {
             var failure: String?
             do {
                 try await Account.finish(day: day, key: lock.key)
+            } catch Account.Failure.signedOut {
+                guard current == generation else { return }
+                authenticationExpired()
+                return
             } catch Account.Failure.conflict(let error) {
                 switch error {
                 case "too_soon": failure = L10n.tr("Not yet")
@@ -266,6 +273,18 @@ final class Model {
             await fetchKeepout(generation: current)
             if current == generation, keepout != nil, let failure { finishProblem = failure }
         }
+    }
+
+    private func authenticationExpired() {
+        // Ignore outstanding replies from the rejected session.
+        generation += 1
+        finishing = false
+        clearKeepout()
+        session = .signedOut
+        people = []
+        updated = nil
+        problem = Account.Failure.signedOut.localizedDescription
+        onboard()
     }
 
     private func clearKeepout() {
