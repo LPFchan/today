@@ -172,8 +172,9 @@ function render() {
     const buttons = node('div', 'routine-actions');
     if (isKeepoutNow) {
       keepoutActions(buttons, keepout);
-    } else if (!keepout && item.keepout && item.phase === 'open' && item.doneAt === null && item.kind === 'window' && item.startedAt === null) {
-      buttons.append(actionButton('start', item, true));
+    } else if (!keepout && item.keepout && item.until.length && item.phase === 'open' && item.kind === 'window') {
+      // Finishing an open window before its deadline means it never locks.
+      buttons.append(actionButton('done', item, true));
     }
     row.append(times, details, buttons);
     list.append(row);

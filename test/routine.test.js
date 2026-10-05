@@ -290,6 +290,18 @@ test('windows open unlocked, start early or force a lock at the deadline', () =>
   assert.equal(itemPhase(day, item, {}, day.ends), 'missed');
 });
 
+test('a window finished while open is done and never locks', () => {
+  const day = makeDay('12:30..14:00 meal ! until photo');
+  const item = day.items[0];
+  const status = { [item.key]: { doneAt: at(day, 13) } };
+  assert.equal(itemPhase(day, item, status[item.key], at(day, 13, 5)), 'done');
+  assert.equal(keepoutState(day, status, at(day, 15)), null);
+  assert.equal(itemPhase(day, item, status[item.key], day.ends), 'done');
+  // Before it opened doesn't count.
+  const tooEarly = { [item.key]: { doneAt: at(day, 12) } };
+  assert.ok(keepoutState(day, tooEarly, at(day, 15)));
+});
+
 test('minimum lock time rejects premature completion and honors its exact boundary', () => {
   const day = makeDay('12:30..14:00 meal ! until photo; min 20m');
   const item = day.items[0];
