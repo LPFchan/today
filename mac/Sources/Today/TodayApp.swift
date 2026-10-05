@@ -28,12 +28,36 @@ struct TodayApp: App {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCenterDelegate, SPUUpdaterDelegate {
     let model = Model()
-    private(set) lazy var updater = SPUStandardUpdaterController(startingUpdater: true, updaterDelegate: nil, userDriverDelegate: nil)
+    private(set) lazy var updater = SPUStandardUpdaterController(startingUpdater: liveUpdates, updaterDelegate: self, userDriverDelegate: nil)
     private var onboardingWindow: OnboardingWindow?
+    private var overlay: KeepoutOverlay?
+    private var powerOffObserver: NSObjectProtocol?
+    private var deferredUpdate: (() -> Void)?
+
+    private var liveUpdates: Bool {
+        #if DEBUG
+        !model.fakeKeepout
+        #else
+        true
+        #endif
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        powerOffObserver = NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.willPowerOffNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.overlay?.endingSession = true }
+        }
+        let overlay = KeepoutOverlay(model: model)
+        self.overlay = overlay
+        overlay.onUnlock = { [weak self] in
+            guard let self, let install = self.deferredUpdate else { return }
+            self.deferredUpdate = nil
+            install()
+        }
+        #if DEBUG
+        if model.fakeKeepout { return }
+        #endif
         // Look for an update on every launch, on top of Sparkle's daily check.
         updater.updater.checkForUpdatesInBackground()
         Alerts.center?.delegate = self
@@ -45,6 +69,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         } else if model.notify {
             Alerts.ask()
         }
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        ProcessOwnership.exitNormally()
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if overlay?.endingSession == true { return .terminateNow }
+        return model.keepout != nil ? .terminateCancel : .terminateNow
+    }
+
+    func updater(_ updater: SPUUpdater, shouldPostponeRelaunchForUpdate item: SUAppcastItem, untilInvokingBlock installHandler: @escaping () -> Void) -> Bool {
+        guard model.keepout != nil else { return false }
+        deferredUpdate = installHandler
+        return true
     }
 
     // Show banners even while the panel is open and Today is the active app.
@@ -62,7 +101,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         onboarding.notify = model.notify
         // A second run starts from how things are now.
         if UserDefaults.standard.bool(forKey: "onboarded") {
-            onboarding.openAtLogin = SMAppService.mainApp.status == .enabled
+            onboarding.openAtLogin = model.openAtLogin
         }
         if model.session == .signedIn { model.refresh() }
         let window = OnboardingWindow(onboarding, model: model)
@@ -79,8 +118,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, UNUserNotificationCent
         guard let window = onboardingWindow else { return }
         onboardingWindow = nil
         UserDefaults.standard.set(true, forKey: "onboarded")
-        let service = SMAppService.mainApp
-        if openAtLogin != (service.status == .enabled) { try? openAtLogin ? service.register() : service.unregister() }
+        model.setOpenAtLogin(openAtLogin)
         window.close()
         // Set after the wizard closes so macOS's permission prompt doesn't cover it.
         model.notify = notify

@@ -10,9 +10,38 @@ to switch people. It posts a notification whenever anyone's next item starts
 It is an OAuth client of the auth hub: it registers a client, opens the
 hub's consent page, and catches the code on a loopback port
 (`http://127.0.0.1:<port>/callback`). The token is bound to
-`https://today.lost.plus/mcp` with scope `today` and reads only `/api/board`,
-an `api` route on the gateway. Tokens sit in
+`https://today.lost.plus/mcp` with scope `today`. It reads `/api/board` and
+`/api/keepout`, and marks its owner’s routine item done through
+`/api/routine/done`; the gateway accepts its bearer token on these routes.
+Tokens sit in
 `~/Library/Application Support/today/tokens.json` (mode 600).
+
+## Routine overlay
+
+For someone using auto-routine, an active keepout covers every display.
+The main display offers Done; the others stay dark. Closing, hiding,
+switching apps, Force Quit from the menu, and ordinary Quit are blocked
+while the cover is up. Done or the lock ending lifts it. Shutdown, restart
+and logout stay allowed.
+
+This is friction, not a prison: killing the process leaves a short unlocked
+gap before the LaunchAgent takes over or relaunches it, targeting about one
+second plus startup time (`ThrottleInterval = 1`). System Settings can still
+disable the agent; macOS must approve it before recovery works.
+
+After this Mac first sees a lock, Open at Login stays on and disabled until
+sign-out. If approval is needed, the panel links to Login Items in System
+Settings. Previously enabled login items migrate to the bundled agent.
+Normal quits outside a lock stay quit; abnormal exits trigger recovery.
+
+The last lock is saved beside the tokens in `today/keepout.json` and restored
+before fetching, so going offline or relaunching offline does not lift it.
+A successful null reply, its `until` time passing, or sign-out clears it.
+Signing out also clears the persisted `enforcing` flag.
+
+On your own Mac, a debug build accepts `--fake-keepout 30` for a 30-second
+preview with no network or login-item changes; Done also ends it. This path
+is absent from release builds. Do not run this preview on a shared host.
 
 ## Build
 

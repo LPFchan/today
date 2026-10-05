@@ -43,7 +43,7 @@ struct OnboardingView: View {
                 case .welcome: WelcomeStep()
                 case .signIn: SignInStep(model: model)
                 case .person: PersonStep(model: model)
-                case .done: DoneStep(onboarding: onboarding)
+                case .done: DoneStep(onboarding: onboarding, model: model)
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -225,7 +225,7 @@ private struct SignInStep: View {
         VStack(spacing: 26) {
             Symbol("person.crop.circle.badge.checkmark")
             Header(title: L10n.tr("Sign in to lost.plus"),
-                   subtitle: L10n.tr("Today reads your plan, and the plans friends share, from your lost.plus account. It can’t change anything."))
+                   subtitle: L10n.tr("Today reads your plan, and the plans friends share, from your lost.plus account."))
             Group {
                 switch model.session {
                 case .signedIn:
@@ -323,6 +323,7 @@ private struct PersonRow: View {
 
 private struct DoneStep: View {
     @Bindable var onboarding: Onboarding
+    let model: Model
 
     var body: some View {
         VStack(spacing: 26) {
@@ -343,7 +344,11 @@ private struct DoneStep: View {
             .frame(maxWidth: 440)
             VStack(spacing: 12) {
                 Switch(L10n.tr("Notify me when anyone’s next item starts"), isOn: $onboarding.notify)
-                Switch(L10n.tr("Open Today when I log in"), isOn: $onboarding.openAtLogin)
+                Switch(L10n.tr("Open Today when I log in"), isOn: Binding(
+                    get: { model.enforcing || onboarding.openAtLogin },
+                    set: { onboarding.openAtLogin = $0 }
+                ))
+                .disabled(model.enforcing)
             }
             .frame(width: 380)
         }

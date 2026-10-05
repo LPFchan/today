@@ -51,7 +51,7 @@ struct Panel: View {
         }
         .padding(.vertical, 10)
         .frame(width: 330)
-        .onAppear { model.refresh() }
+        .onAppear { model.syncLoginItem(); model.refresh() }
     }
 }
 
@@ -303,7 +303,6 @@ private struct SignInCard: View {
 private struct MenuRows: View {
     let model: Model
     let updater: SPUStandardUpdaterController
-    @State private var openAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
         VStack(spacing: 0) {
@@ -320,15 +319,18 @@ private struct MenuRows: View {
             }
             separator
             Row(title: L10n.tr("Notify When Items Start"), checked: model.notify) { model.notify.toggle() }
-            Row(title: L10n.tr("Open at Login"), checked: openAtLogin) {
-                let service = SMAppService.mainApp
-                do {
-                    if service.status == .enabled { try service.unregister() } else { try service.register() }
-                } catch {
-                    // Usually switched off in System Settings; send them there.
-                    SMAppService.openSystemSettingsLoginItems()
+            Row(title: L10n.tr("Open at Login"), checked: model.openAtLogin) {
+                model.setOpenAtLogin(!model.openAtLogin)
+            }
+            .disabled(model.enforcing)
+            if model.loginApproval {
+                HStack(spacing: 6) {
+                    Text(L10n.tr("Allow Today in Login Items."))
+                    Button(L10n.tr("Open Settings")) { SMAppService.openSystemSettingsLoginItems() }
                 }
-                openAtLogin = service.status == .enabled
+                .font(.system(size: 11))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
             }
             separator
             Row(title: L10n.tr("Check for Updates…")) {

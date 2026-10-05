@@ -16,7 +16,8 @@ swift build -c release --arch arm64 --package-path "$root"
 bin=$(swift build -c release --arch arm64 --package-path "$root" --show-bin-path)
 
 rm -rf "$app"
-mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources"
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Frameworks" "$app/Contents/Resources" "$app/Contents/Library/LaunchAgents"
+cp "$root/LaunchAgents/plus.lost.today.plist" "$app/Contents/Library/LaunchAgents/plus.lost.today.plist"
 cp "$bin/Today" "$app/Contents/MacOS/Today"
 ditto "$bin/Sparkle.framework" "$app/Contents/Frameworks/Sparkle.framework"
 cp "$root/Resources/AppIcon.icns" "$app/Contents/Resources/AppIcon.icns"

@@ -1,5 +1,6 @@
 import AppKit
 import Observation
+import ServiceManagement
 
 /// Everything the menu bar and the panel show.
 @MainActor @Observable
@@ -7,6 +8,13 @@ final class Model {
     enum Session: Equatable { case signedOut, signingIn, signedIn }
 
     var session: Session = TokenStore.load() == nil ? .signedOut : .signedIn
+    var keepout: Keepout?
+    var keepoutDay: String?
+    var finishing = false
+    var finishProblem: String?
+    private(set) var enforcing = false
+    private(set) var openAtLogin = false
+    private(set) var loginApproval = false
     var people: [Person] = []
     var updated: Date?
     var problem: String?
@@ -32,6 +40,15 @@ final class Model {
     @ObservationIgnored private var loading = false
     @ObservationIgnored private var lastTry = Date.distantPast
     @ObservationIgnored private var signIn: Task<Void, Never>?
+    @ObservationIgnored private var keepoutTask: Task<Void, Never>?
+    @ObservationIgnored private var lastKeepoutTry = Date.distantPast
+    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var savedKeepout: KeepoutReply?
+    @ObservationIgnored private var lastLoginTry = Date.distantPast
+    @ObservationIgnored private var signingOut: Task<Void, Never>?
+    #if DEBUG
+    @ObservationIgnored private(set) var fakeKeepout = false
+    #endif
     /// Opens the onboarding window, where signing in happens; the app
     /// delegate fills it in.
     @ObservationIgnored var onboard: () -> Void = {}
@@ -40,13 +57,60 @@ final class Model {
     init(live: Bool = true) {
         self.live = live
         guard live else { return }
+        #if DEBUG
+        if let flag = CommandLine.arguments.firstIndex(of: "--fake-keepout"),
+           flag + 1 < CommandLine.arguments.count,
+           let seconds = Double(CommandLine.arguments[flag + 1]), seconds.isFinite, seconds > 0 {
+            fakeKeepout = true
+            session = .signedIn
+            let body: [String: Any] = [
+                "key": "fake", "name": L10n.tr("Today"), "kind": "fixed",
+                "since": now.timeIntervalSince1970 * 1000,
+                "until": now.addingTimeInterval(seconds).timeIntervalSince1970 * 1000,
+                "needs": ["done"], "canStart": false, "canDone": true,
+                "doneAfter": now.timeIntervalSince1970 * 1000,
+            ]
+            if let data = try? JSONSerialization.data(withJSONObject: body) {
+                keepout = try? JSONDecoder().decode(Keepout.self, from: data)
+            }
+        }
+        #endif
+        if !preview {
+            ProcessOwnership.claim()
+            // Complete a sign-out interrupted by termination or an in-flight request.
+            if UserDefaults.standard.bool(forKey: "signingOut") {
+                TokenStore.clear()
+                KeepoutStore.clear()
+                UserDefaults.standard.set(false, forKey: "enforcing")
+                UserDefaults.standard.set(false, forKey: "signingOut")
+            }
+            session = TokenStore.load() == nil ? .signedOut : .signedIn
+            now = Date()
+            enforcing = UserDefaults.standard.bool(forKey: "enforcing")
+            // Restore the cover before polling, including after an offline relaunch.
+            if let reply = KeepoutStore.load(), let lock = reply.keepout {
+                if lock.until.map({ $0 > now }) ?? true {
+                    savedKeepout = reply
+                    keepout = lock
+                    keepoutDay = reply.day
+                    enforcing = true
+                    UserDefaults.standard.set(true, forKey: "enforcing")
+                } else {
+                    KeepoutStore.clear()
+                }
+            }
+            LoginItem.migrate()
+            syncLoginItem()
+            if LoginItem.service.status == .enabled { ProcessOwnership.startAgent() }
+        }
         let tick = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
             MainActor.assumeIsolated { self?.tick() }
         }
         RunLoop.main.add(tick, forMode: .common)
         NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didWakeNotification, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.refresh() }
+            MainActor.assumeIsolated { self?.refresh(); self?.refreshKeepout() }
         }
+        refreshKeepout()
         refresh()
     }
 
@@ -55,8 +119,22 @@ final class Model {
         people.first { $0.id == selection } ?? people.first { $0.me }
     }
 
+    private var preview: Bool {
+        #if DEBUG
+        fakeKeepout
+        #else
+        false
+        #endif
+    }
+
+    var next: Item? { people.first { $0.me }?.items.first { $0.start > now } }
+
     private func tick() {
         now = Date()
+        if let until = keepout?.until, until <= now { clearKeepout() }
+        if preview { return }
+        if now.timeIntervalSince(lastLoginTry) >= 15 { syncLoginItem() }
+        if now.timeIntervalSince(lastKeepoutTry) >= 15 { refreshKeepout() }
         // Plans change rarely; the timers run locally in between.
         if session == .signedIn, now.timeIntervalSince(lastTry) >= 60 { refresh() }
         // You are always on a loaded board, so an empty one means none yet.
@@ -79,39 +157,141 @@ final class Model {
     }
 
     func refresh() {
-        guard live, session == .signedIn, !loading else { return }
+        guard live, !preview, session == .signedIn, !loading else { return }
         loading = true
         lastTry = Date()
+        let current = generation
         Task {
             defer { loading = false }
             do {
-                people = try await Account.board().people
+                let board = try await Account.board()
+                guard current == generation else { return }
+                people = board.people
                 updated = Date()
                 problem = nil
             } catch Account.Failure.signedOut {
-                session = .signedOut
+                guard current == generation else { return }
+                if keepout == nil { session = .signedOut }
                 people = []
                 problem = Account.Failure.signedOut.localizedDescription
             } catch {
+                guard current == generation else { return }
                 // Keep showing the last board; the timers are still right.
                 problem = error.localizedDescription
             }
         }
     }
 
+    func refreshKeepout() {
+        guard live, !preview, session == .signedIn, keepoutTask == nil, !finishing else { return }
+        let current = generation
+        keepoutTask = Task {
+            defer { keepoutTask = nil }
+            await fetchKeepout(generation: current)
+        }
+    }
+
+    private func fetchKeepout(generation current: Int) async {
+        lastKeepoutTry = Date()
+        do {
+            let reply = try await Account.keepout()
+            guard current == generation else { return }
+            finishProblem = nil
+            keepout = reply.keepout
+            keepoutDay = reply.day
+            if keepout != nil, !enforcing {
+                enforcing = true
+                UserDefaults.standard.set(true, forKey: "enforcing")
+                syncLoginItem()
+            }
+            if let until = keepout?.until, until <= Date() {
+                clearKeepout()
+            } else if savedKeepout != reply || reply.keepout == nil {
+                try KeepoutStore.save(reply)
+                savedKeepout = reply
+            }
+        } catch {
+            guard current == generation else { return }
+            // A failed request never drops a lock, including an expired token.
+            finishProblem = error.localizedDescription
+        }
+    }
+
+    func finish() {
+        guard let lock = keepout, !finishing else { return }
+        if preview { clearKeepout(); return }
+        guard let day = keepoutDay else { return }
+        finishing = true
+        finishProblem = nil
+        let current = generation
+        Task {
+            defer { if current == generation { finishing = false } }
+            // Drain an older GET before Done so its reply cannot restore the lock.
+            await keepoutTask?.value
+            guard current == generation, keepout?.key == lock.key, keepoutDay == day else { return }
+            var failure: String?
+            do {
+                try await Account.finish(day: day, key: lock.key)
+            } catch Account.Failure.conflict(let error) {
+                switch error {
+                case "too_soon": failure = L10n.tr("Not yet")
+                case "not_due", "locked": failure = L10n.tr("Refreshing…")
+                default: failure = error
+                }
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard current == generation else { return }
+            await fetchKeepout(generation: current)
+            if current == generation, keepout != nil, let failure { finishProblem = failure }
+        }
+    }
+
+    private func clearKeepout() {
+        keepout = nil
+        savedKeepout = nil
+        keepoutDay = nil
+        finishProblem = nil
+        if live, !preview { KeepoutStore.clear() }
+    }
+
+    func syncLoginItem() {
+        guard live, !preview, !UserDefaults.standard.bool(forKey: "signingOut") else { return }
+        lastLoginTry = Date()
+        do { try LoginItem.sync(enforcing: enforcing) } catch { problem = error.localizedDescription }
+        openAtLogin = enforcing || LoginItem.wanted || LoginItem.service.status == .enabled
+        loginApproval = LoginItem.service.status == .requiresApproval
+    }
+
+    func setOpenAtLogin(_ enabled: Bool) {
+        guard live, !preview else { return }
+        do { try LoginItem.set(enabled, enforcing: enforcing) } catch {
+            problem = error.localizedDescription
+            SMAppService.openSystemSettingsLoginItems()
+        }
+        syncLoginItem()
+    }
+
     func startSignIn() {
         signIn?.cancel()
+        generation += 1
+        let current = generation
         session = .signingIn
         problem = nil
         signIn = Task {
             do {
+                await signingOut?.value
+                try Task.checkCancellation()
                 _ = try await Account.signIn()
+                guard current == generation else { return }
                 session = .signedIn
+                refreshKeepout()
                 refresh()
                 NSApp.activate()
             } catch is CancellationError {
-                if session == .signingIn { session = .signedOut }
+                if current == generation, session == .signingIn { session = .signedOut }
             } catch {
+                guard current == generation else { return }
                 session = .signedOut
                 problem = error.localizedDescription
             }
@@ -119,17 +299,32 @@ final class Model {
     }
 
     func cancelSignIn() {
+        generation += 1
         signIn?.cancel()
         signIn = nil
         session = .signedOut
     }
 
     func signOut() {
+        generation += 1
+        signIn?.cancel()
         session = .signedOut
+        finishing = false
+        clearKeepout()
+        enforcing = false
+        if live, !preview {
+            UserDefaults.standard.set(true, forKey: "signingOut")
+            UserDefaults.standard.set(false, forKey: "enforcing")
+        }
         people = []
         updated = nil
         problem = nil
-        Task { await Account.signOut() }
+        if live, !preview {
+            signingOut = Task {
+                await Account.signOut()
+                syncLoginItem()
+            }
+        }
         onboard()
     }
 }
