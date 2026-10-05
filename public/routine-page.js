@@ -124,7 +124,7 @@ function nowKey() {
 function render() {
   const today = routine.today;
   const keepout = today?.keepout;
-  $('routineToday').hidden = false;
+  $('routineToday').hidden = !routine.enabled;
   $('routinePending').hidden = !routine.pendingFrom;
   $('routinePending').textContent = routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : '';
 
