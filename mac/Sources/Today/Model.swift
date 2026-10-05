@@ -97,7 +97,10 @@ final class Model {
                 enforcing = true
                 UserDefaults.standard.set(true, forKey: "enforcing")
             } else if session == .signedOut {
+                // No credentials means nothing to enforce, however we got here.
                 KeepoutStore.clear()
+                enforcing = false
+                UserDefaults.standard.set(false, forKey: "enforcing")
             }
             LoginItem.migrate()
             syncLoginItem()
