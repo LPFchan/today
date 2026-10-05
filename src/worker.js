@@ -90,7 +90,8 @@ async function api(request, env, url) {
     case 'GET /api/keepout': {
       const now = Date.now();
       const routine = await currentRoutine(env, me, now);
-      return json(200, { now, keepout: routine.today?.keepout ?? null });
+      // `day` is what start and done expect alongside the item key.
+      return json(200, { now, day: routine.today?.day ?? null, keepout: routine.today?.keepout ?? null });
     }
     default:
       return json(404, { error: 'not_found' });
