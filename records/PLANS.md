@@ -49,17 +49,8 @@ before it binds.
 
 ### Near Term
 
-- Phase 4 — wake-up alarm in brief:
-  - Why now: the overlay it acknowledges against has shipped.
-  - Dependencies: phases 1–2.
-  - Scope: at 12:00, SSH to the MacBook, unmute, set volume, play audio until
-    acknowledged; fall back to dumpling when the MacBook is unreachable.
-  - Related ids: DEC-20261005-001
-
-### Mid Term
-
 - Phase 5 — proofs in brief:
-  - Why later: needs item status in today to write into.
+  - Why now: item status and the alarm are in place; proofs are the next way out of a lock.
   - Dependencies: phase 1; findmy-mcp on dumpling; an auth gateway route and
     service credential that let brief write proof results for the operator.
   - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
@@ -69,11 +60,14 @@ before it binds.
     library Home Assistant uses) and checks the run finished. The Roborock
     has no schedule of its own; brief is the only thing that runs it.
   - Related ids: DEC-20261005-001
+
+### Mid Term
+
 - Phase 6 — away mode and affordances:
   - Why later: bypasses matter once the lock is real.
   - Dependencies: phases 1, 4, 5 (every proof exists before the temporary
     "done" path goes away); an auth route that lets Hermes grant affordances.
-  - Scope: away mode set at least a day ahead; a Hermes tool that grants one
+  - Scope: days off from the calendar already ship (phase 4); a Hermes tool that grants one
     item for today only, or switches auto-routine off (DEC-20261005-002), with
     a guideline to weigh the request; brief reports
     misses and bypasses each morning.
