@@ -3,12 +3,12 @@ import CryptoKit
 import Foundation
 import Network
 
-/// Signing in to lost.plus and reading the board.
+/// Signing in to lost.plus, reading plans and finishing your routine item.
 ///
 /// The app is an OAuth client of the auth hub: it registers a client, sends
 /// the browser to the hub's consent page, and catches the code on a loopback
 /// port (RFC 8252). The token is bound to today.lost.plus with
-/// scope `today`; the gateway checks it on /api/board.
+/// scope `today`; the gateway checks it on the board and routine routes.
 enum Account {
     static let base = URL(string: "https://today.lost.plus")!
     static let hub = URL(string: "https://auth.lost.plus")!
@@ -18,13 +18,14 @@ enum Account {
     static let redirect = "http://127.0.0.1/callback"
 
     enum Failure: LocalizedError {
-        case offline, declined, signedOut, server(Int)
+        case offline, declined, signedOut, server(Int), conflict(String)
         var errorDescription: String? {
             switch self {
             case .offline: "Couldn’t reach lost.plus. Try again in a moment."
             case .declined: "Sign-in was cancelled."
             case .signedOut: "You’ve been signed out."
             case .server(let status): "lost.plus answered \(status)."
+            case .conflict(let error): error
             }
         }
     }
@@ -64,16 +65,20 @@ enum Account {
 
         let query = try await callback.wait()
         guard query["state"] == state, let code = query["code"] else { throw Failure.declined }
-        let tokens = try await tokenRequest([
-            "grant_type": "authorization_code",
-            "code": code,
-            "redirect_uri": redirectURI,
-            "client_id": clientID,
-            "code_verifier": verifier,
-            "resource": resource,
-        ], clientID: clientID)
-        try TokenStore.save(tokens)
-        return tokens
+        return try await requests.run {
+            let tokens = try await tokenRequest([
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirectURI,
+                "client_id": clientID,
+                "code_verifier": verifier,
+                "resource": resource,
+            ], clientID: clientID)
+            try Task.checkCancellation()
+            KeepoutStore.clear()
+            try TokenStore.save(tokens)
+            return tokens
+        }
     }
 
     /// A fresh public client per sign-in; the hub drops ones never used.
@@ -98,12 +103,17 @@ enum Account {
 
     /// Revokes the refresh token at the hub (best effort) and forgets it.
     static func signOut() async {
-        if let tokens = TokenStore.load() {
-            var request = formRequest(hub.appending(path: "oauth/revoke"), ["token": tokens.refresh, "client_id": tokens.clientID])
-            request.timeoutInterval = 5
-            _ = try? await send(request)
+        _ = try? await requests.run {
+            let tokens = TokenStore.load()
+            TokenStore.clear()
+            KeepoutStore.clear()
+            UserDefaults.standard.set(false, forKey: "signingOut")
+            if let tokens {
+                var request = formRequest(hub.appending(path: "oauth/revoke"), ["token": tokens.refresh, "client_id": tokens.clientID])
+                request.timeoutInterval = 5
+                _ = try? await send(request)
+            }
         }
-        TokenStore.clear()
     }
 
     /* ---------- tokens ---------- */
@@ -122,46 +132,69 @@ enum Account {
 
     /// Refresh tokens rotate: the new pair is saved before anything uses it.
     private static func refreshed(_ tokens: Tokens) async throws -> Tokens {
-        do {
-            let next = try await tokenRequest([
-                "grant_type": "refresh_token",
-                "refresh_token": tokens.refresh,
-                "client_id": tokens.clientID,
-                "resource": resource,
-            ], clientID: tokens.clientID)
-            try TokenStore.save(next)
-            return next
-        } catch Failure.signedOut {
-            TokenStore.clear()
-            throw Failure.signedOut
-        }
+        let next = try await tokenRequest([
+            "grant_type": "refresh_token",
+            "refresh_token": tokens.refresh,
+            "client_id": tokens.clientID,
+            "resource": resource,
+        ], clientID: tokens.clientID)
+        try TokenStore.save(next)
+        return next
     }
 
-    /* ---------- the board ---------- */
+    /* ---------- authorized requests ---------- */
 
-    /// GET /api/board, refreshing the access token when it is old or refused.
-    /// Callers must not overlap calls: a refresh spends the refresh token.
+    private static let requests = RequestQueue()
+
     static func board() async throws -> Board {
-        guard var tokens = TokenStore.load() else { throw Failure.signedOut }
-        if tokens.expires < Date().addingTimeInterval(60) { tokens = try await refreshed(tokens) }
-        var (data, status) = try await get("api/board", token: tokens.access)
-        if status == 401 {
-            tokens = try await refreshed(tokens)
-            (data, status) = try await get("api/board", token: tokens.access)
-        }
-        if status == 401 {
-            TokenStore.clear()
-            throw Failure.signedOut
-        }
-        guard status == 200 else { throw Failure.server(status) }
+        let data = try await authorized("api/board")
         return try JSONDecoder().decode(Board.self, from: data)
     }
 
-    private static func get(_ path: String, token: String) async throws -> (Data, Int) {
-        var request = URLRequest(url: base.appending(path: path))
-        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
-        return try await send(request)
+    static func keepout() async throws -> KeepoutReply {
+        let data = try await authorized("api/keepout")
+        return try JSONDecoder().decode(KeepoutReply.self, from: data)
+    }
+
+    static func finish(day: String, key: String) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["day": day, "key": key])
+        _ = try await authorized("api/routine/done", body: body)
+    }
+
+    /// Hold the queue through refresh, save, request and the one retry.
+    private static func authorized(_ path: String, body: Data? = nil) async throws -> Data {
+        try await requests.run {
+            do {
+                guard var tokens = TokenStore.load() else { throw Failure.signedOut }
+                if tokens.expires < Date().addingTimeInterval(60) { tokens = try await refreshed(tokens) }
+                var request = URLRequest(url: base.appending(path: path))
+                request.setValue("application/json", forHTTPHeaderField: "Accept")
+                if let body {
+                    request.httpMethod = "POST"
+                    request.httpBody = body
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                }
+                request.setValue("Bearer \(tokens.access)", forHTTPHeaderField: "Authorization")
+                var (data, status) = try await send(request)
+                if status == 401 {
+                    tokens = try await refreshed(tokens)
+                    request.setValue("Bearer \(tokens.access)", forHTTPHeaderField: "Authorization")
+                    (data, status) = try await send(request)
+                }
+                if status == 401 { throw Failure.signedOut }
+                if status == 409 {
+                    struct Conflict: Decodable { let error: String }
+                    throw Failure.conflict(try JSONDecoder().decode(Conflict.self, from: data).error)
+                }
+                guard status == 200 else { throw Failure.server(status) }
+                return data
+            } catch Failure.signedOut {
+                // Clear rejected credentials and their lock before releasing the queue.
+                TokenStore.clear()
+                KeepoutStore.clear()
+                throw Failure.signedOut
+            }
+        }
     }
 
     /* ---------- HTTP ---------- */
@@ -205,6 +238,25 @@ enum Account {
             .replacingOccurrences(of: "+", with: "-")
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
+    }
+}
+
+/// Actors can re-enter at await: a FIFO gate covers the entire operation.
+private actor RequestQueue {
+    private var busy = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
+
+    func run<T>(_ operation: () async throws -> T) async throws -> T {
+        if busy {
+            await withCheckedContinuation { waiting.append($0) }
+        } else {
+            busy = true
+        }
+        defer {
+            if waiting.isEmpty { busy = false } else { waiting.removeFirst().resume() }
+        }
+        try Task.checkCancellation()
+        return try await operation()
     }
 }
 
