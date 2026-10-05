@@ -83,18 +83,19 @@ struct KeepoutView: View {
 
     /// "완료를 눌러 해제하기" / "Unlock by marking it done.", or when time lifts it.
     private var unlocks: String {
-        if lock.needs.isEmpty {
+        let needs = lock.remainingNeeds
+        if needs.isEmpty {
             guard let until = lock.until else { return "" }
             return String(format: L10n.tr("Unlocks at %@"), Self.time.string(from: until))
         }
         if Self.korean {
-            let phrases = lock.needs.enumerated().map { index, need in
+            let phrases = needs.enumerated().map { index, need in
                 let forms = Self.koForms[need] ?? ("", "")
-                return index == lock.needs.count - 1 ? forms.last : forms.then
+                return index == needs.count - 1 ? forms.last : forms.then
             }
             return phrases.joined(separator: " ") + " 해제하기"
         }
-        let phrases = lock.needs.map { Self.enPhrases[$0] ?? $0 }
+        let phrases = needs.map { Self.enPhrases[$0] ?? $0 }
         let list = phrases.count < 2
             ? phrases.joined()
             : phrases.dropLast().joined(separator: ", ") + " and " + phrases.last!

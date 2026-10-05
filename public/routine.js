@@ -339,6 +339,11 @@ export function progress(day, item, status, now) {
   return { since, doneAfter, done, startedAt, proofs };
 }
 
+/** Requirements still outstanding; Done remains an explicit button action. */
+export function remainingNeeds(lock) {
+  return lock.needs.filter((need) => need === 'done' || !(lock.have ?? []).includes(need));
+}
+
 /** Current keepout; proof-bearing locks expire at the next instance's start. */
 export function keepoutState(day, statuses, now) {
   if (now >= day.ends) return null;

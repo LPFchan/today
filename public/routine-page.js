@@ -1,4 +1,5 @@
 import { lang, t, translatePage } from './i18n.js';
+import { remainingNeeds } from './routine.js';
 
 translatePage();
 document.title = `${t('routineTitle')} · today`;
@@ -140,8 +141,9 @@ function render() {
     const details = node('div', 'routine-item-details');
     details.append(node('span', 'routine-item-name', item.name));
     if (isKeepoutNow) {
-      const unlocks = keepout.needs.length
-        ? unlockSentence(keepout.needs)
+      const needs = remainingNeeds(keepout);
+      const unlocks = needs.length
+        ? unlockSentence(needs)
         : keepout.until !== null
           ? t('routineUnlockAt', { time: clock(keepout.until) })
           : t('routineWaitingUnlock');

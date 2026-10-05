@@ -12,6 +12,8 @@ struct Keepout: Decodable, Equatable {
     let canDone: Bool
     let doneAfter: Date
 
+    var remainingNeeds: [String] { needs.filter { $0 == "done" || !have.contains($0) } }
+
     private enum CodingKeys: String, CodingKey {
         case key, name, kind, since, until, needs, have, canStart, canDone, doneAfter
     }

@@ -8,14 +8,21 @@ import Foundation
         ]]
         let old = try JSONDecoder().decode(KeepoutReply.self, from: JSONSerialization.data(withJSONObject: base))
         precondition(old.keepout?.have == [])
+        precondition(old.keepout?.remainingNeeds == ["wake", "photo"])
         var present = base
         var lock = present["keepout"] as! [String: Any]
         lock["have"] = ["wake"]
         present["keepout"] = lock
         let accepted = try JSONDecoder().decode(KeepoutReply.self, from: JSONSerialization.data(withJSONObject: present))
         precondition(accepted.keepout?.have == ["wake"])
+        precondition(accepted.keepout?.remainingNeeds == ["photo"])
         let cached = try JSONDecoder().decode(KeepoutReply.self, from: JSONEncoder().encode(accepted))
         precondition(cached == accepted)
+        lock["needs"] = ["wake", "done"]
+        lock["have"] = ["wake", "done"]
+        present["keepout"] = lock
+        let button = try JSONDecoder().decode(KeepoutReply.self, from: JSONSerialization.data(withJSONObject: present))
+        precondition(button.keepout?.remainingNeeds == ["done"])
         lock["have"] = "wake"
         present["keepout"] = lock
         do {
