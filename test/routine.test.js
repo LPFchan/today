@@ -246,7 +246,7 @@ test('fixed time-only locks ignore completion and stop at their slot end', () =>
   const state = keepoutState(day, { [item.key]: { doneAt: at(day, 12) } }, at(day, 12, 30));
   assert.deepEqual(state, {
     key: item.key, name: 'sleep', kind: 'fixed', since: at(day, 12), until: at(day, 13),
-    needs: [], canStart: false, canDone: false, doneAfter: at(day, 12),
+    needs: [], have: [], canStart: false, canDone: false, doneAfter: at(day, 12),
   });
   assert.equal(keepoutState(day, {}, at(day, 13)), null);
   assert.equal(itemPhase(day, item, {}, at(day, 12)), 'locked');

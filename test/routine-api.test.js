@@ -1050,3 +1050,181 @@ test('routine materialization preserves moments in the profile, board and watch 
   assert.deepEqual(board[0], { start: instant('12:00'), end: instant('12:00'), name: 'wake up' });
   assert.deepEqual(board[1], { start: instant('12:00'), end: instant('12:30'), name: 'wash face, brush teeth' });
 });
+
+test('proof collectors see only an eligible item and its window', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  assert.equal((await call('GET', '/api/keepout?proof=away')).body.item, null);
+  await enable('12:00 Wake ! until wake\n12:30..14:00 Outing ! until away 30m, photo');
+  at('12:30');
+  assert.equal((await call('GET', '/api/keepout?proof=away')).body.item, null);
+  await proofCall(call, 'wake');
+  const item = (await call('GET', '/api/keepout?proof=away')).body.item;
+  assert.deepEqual(item, { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'), awayMinutes: 30 });
+  at('14:00');
+  assert.deepEqual((await call('GET', '/api/keepout?proof=away')).body.item, item);
+  await proofCall(call, 'away');
+  assert.equal((await call('GET', '/api/keepout?proof=away')).body.item, null);
+  assert.equal((await call('GET', '/api/keepout?proof=photo')).body.item.key, item.key);
+  await proofCall(call, 'photo');
+  assert.equal((await call('GET', '/api/keepout?proof=photo')).body.item, null);
+  expectError(await call('GET', '/api/keepout?proof=other'), 400, 'bad_request');
+});
+
+const proofCall = (call, proof, extra = {}) => call('POST', '/api/routine/proof', { proof, ...extra });
+
+test('automatic wake proof completes the current lock and explicit retries preserve the proof', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable(DEFAULT_ROUTINE);
+  const result = await proofCall(call, 'wake', { note: 'awake' });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.item.key, '12:00');
+  assert.equal(result.body.item.phase, 'done');
+  assert.deepEqual(result.body.item.proofs, { wake: { at: instant('12:00'), note: 'awake' } });
+  assert.equal(result.body.keepout.key, '12:00#2');
+  at('12:10');
+  const retry = await proofCall(call, 'wake', { day: '2026-10-05', key: '12:00', note: 'changed' });
+  assert.equal(retry.status, 200);
+  assert.deepEqual(retry.body.item.proofs, result.body.item.proofs);
+  expectError(await proofCall(call, 'wake'), 409, 'not_needed');
+  const current = (await call('GET', '/api/routine')).body.today;
+  assert.deepEqual(current.items[0].proofs, result.body.item.proofs);
+  assert.equal((await call('GET', '/api/routine', undefined, 'other')).body.today, null);
+});
+
+test('two-proof lock needs both, exposes have, and allows automatic partial retries', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
+  await enable('12:00..13:00 Outing ! until away 30m, photo');
+  at('13:00');
+  assert.deepEqual((await call('GET', '/api/keepout')).body.keepout.have, []);
+  const away = await proofCall(call, 'away');
+  assert.equal(away.status, 200);
+  assert.equal(away.body.item.phase, 'locked');
+  assert.deepEqual(away.body.keepout.needs, ['away', 'photo']);
+  assert.deepEqual(away.body.keepout.have, ['away']);
+  assert.deepEqual((await call('GET', '/api/keepout')).body.keepout.have, ['away']);
+  const text = await keepoutResponse(DB);
+  assert.equal(await text.text(), 'today keepout: Outing. mark it done on today.lost.plus to unlock.\n');
+  at('13:10');
+  assert.deepEqual((await proofCall(call, 'away', { note: 'retry' })).body.item.proofs, away.body.item.proofs);
+  const photo = await proofCall(call, 'photo', { day: '2026-10-05', key: '12:00..13:00', note: 'dinner' });
+  assert.equal(photo.status, 200);
+  assert.equal(photo.body.item.phase, 'done');
+  assert.equal(photo.body.keepout, null);
+  assert.deepEqual(Object.keys(photo.body.item.proofs), ['away', 'photo']);
+});
+
+test('proof validation rejects bad bodies, wrong days, missing proofs, future items and other locks', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake\n12:30..14:00 Meal ! until photo');
+  for (const body of [null, {}, [], { proof: 'done' }, { proof: 'wake', note: 1 },
+    { proof: 'wake', note: null }, { proof: 'wake', note: 'x'.repeat(201) },
+    { proof: 'wake', day: '2026-10-05' }, { proof: 'wake', key: '12:00' }]) {
+    expectError(await call('POST', '/api/routine/proof', body), 400, 'bad_request');
+  }
+  expectError(await call('POST', '/api/routine/proof', { proof: 'wake' }, null), 401, 'unauthenticated');
+  expectError(await proofCall(call, 'wake', { day: '2026-10-04', key: '12:00' }), 409, 'not_due');
+  expectError(await proofCall(call, 'wake', { day: '2026-10-05', key: 'missing' }), 409, 'not_due');
+  expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:00' }), 409, 'not_needed');
+  expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:30..14:00' }), 409, 'locked');
+  assert.equal((await proofCall(call, 'wake', { note: '🦊'.repeat(200) })).status, 200);
+  expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:30..14:00' }), 409, 'not_due');
+  expectError(await proofCall(call, 'photo'), 409, 'not_needed');
+  at('12:30');
+  assert.equal((await proofCall(call, 'photo')).status, 200);
+});
+
+test('proofs respect minimum timing once locked and Done still overrides all proofs', async (t) => {
+  const { enable, call, status, at } = setup(t, '12:30');
+  await enable('12:30..14:00 Outing ! until away 30m, photo; min 20m');
+  await status('start', '12:30..14:00');
+  expectError(await proofCall(call, 'away'), 409, 'too_soon');
+  at('12:50');
+  assert.equal((await proofCall(call, 'away')).body.item.phase, 'locked');
+  assert.equal((await status('done', '12:30..14:00')).body.today.items[0].phase, 'done');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+});
+
+test('wake alongside done still needs the manual button', async (t) => {
+  const { enable, call, status } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake, done');
+  const wake = await proofCall(call, 'wake');
+  assert.equal(wake.body.item.phase, 'locked');
+  assert.deepEqual(wake.body.keepout.have, ['wake']);
+  assert.deepEqual(wake.body.keepout.needs, ['wake', 'done']);
+  assert.equal((await status('done', '12:00')).body.today.items[0].phase, 'done');
+});
+
+for (const explicit of [false, true]) {
+  test(`window proof while open counts after the deadline (${explicit ? 'explicit' : 'automatic'})`, async (t) => {
+    const { enable, call, status, at } = setup(t, '12:00');
+    await enable('12:00..13:00 Meal ! until photo; min 20m');
+    const extra = explicit ? { day: '2026-10-05', key: '12:00..13:00' } : {};
+    const result = await proofCall(call, 'photo', extra);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.item.phase, 'done');
+    assert.equal(result.body.item.doneAt, null);
+    expectError(await status('start', '12:00..13:00'), 409, 'already');
+    at('13:30');
+    assert.equal((await call('GET', '/api/routine')).body.today.items[0].phase, 'done');
+    assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  });
+}
+
+test('proof timestamps outside the item instance do not satisfy it', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake; min 20m');
+  const write = (at) => DB.raw.prepare('INSERT INTO routine_status (sub, day, key, proofs) VALUES (?, ?, ?, ?) '
+    + 'ON CONFLICT (sub, day, key) DO UPDATE SET proofs = excluded.proofs')
+    .run('owner', '2026-10-05', '12:00', JSON.stringify({ wake: { at, note: '' } }));
+  at('12:30');
+  for (const timestamp of [instant('11:59'), instant('12:19'), instant('12:31'), instant('12:00', '2026-10-06')]) {
+    write(timestamp);
+    assert.equal((await call('GET', '/api/routine')).body.today.items[0].phase, 'locked');
+    assert.deepEqual((await call('GET', '/api/keepout')).body.keepout.have, []);
+  }
+  write(instant('12:20'));
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+});
+
+test('proofs prune with old status and are unavailable on away days', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake');
+  await proofCall(call, 'wake');
+  await call('PUT', '/api/routine/away', { day: '2026-10-06', away: true });
+  at('12:00', '2026-10-06');
+  expectError(await proofCall(call, 'wake'), 409, 'not_needed');
+  expectError(await proofCall(call, 'wake', { day: '2026-10-06', key: '12:00' }), 409, 'not_due');
+  at('12:00', '2026-10-07');
+  await call('GET', '/api/routine');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+});
+
+test('simultaneous different proofs both survive the JSON merge', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable('12:00..13:00 Outing ! until away 30m, photo');
+  at('13:00');
+  const results = await Promise.all([proofCall(call, 'away'), proofCall(call, 'photo')]);
+  assert.ok(results.every((result) => result.status === 200));
+  const item = (await call('GET', '/api/routine')).body.today.items[0];
+  assert.deepEqual(Object.keys(item.proofs), ['away', 'photo']);
+  assert.equal(item.phase, 'done');
+});
+
+test('automatic selection prefers the current lock and blocks another open window', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable('12:00-12:30 Wake ! until wake, photo\n12:30..14:00 Meal ! until photo');
+  at('12:30');
+  const photo = await proofCall(call, 'photo');
+  assert.equal(photo.body.item.key, '12:00-12:30');
+  assert.equal(photo.body.item.phase, 'locked');
+  await proofCall(call, 'wake');
+  assert.equal((await proofCall(call, 'photo')).body.item.key, '12:30..14:00');
+});
+
+test('automatic selection cannot write an open window during an unrelated lock', async (t) => {
+  const { enable, call, at, DB } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake\n12:30..14:00 Meal ! until photo');
+  at('12:30');
+  expectError(await proofCall(call, 'photo'), 409, 'locked');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+});

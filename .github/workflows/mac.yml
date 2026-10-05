@@ -36,6 +36,9 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple: -s -k "" "$kc"
           security list-keychains -d user -s "$kc" $(security list-keychains -d user | tr -d '"')
 
+      - name: Check keepout decoding and cache compatibility
+        run: sh mac/scripts/test-keepout.sh
+
       - name: Build
         run: |
           sh mac/scripts/build-app.sh
