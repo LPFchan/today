@@ -82,20 +82,15 @@ test('plain-text time locks use HH:MM in the routine timezone', async (t) => {
   assert.equal(await response.text(), 'today keepout: sleep until 12:00. try again then.\n');
 });
 
-for (const [needs, action] of [
-  ['done', 'mark it done on today.lost.plus'],
-  ['wake', "confirm you're up"],
-  ['photo', 'send a meal photo'],
-  ['away 30m', 'head out for a while'],
-  ['wake, done, photo, away 30m', "confirm you're up and mark it done on today.lost.plus and send a meal photo and head out for a while"],
-]) {
-  test(`plain-text action lock describes ${needs}`, async (t) => {
+// Done unlocks every proof until proofs land.
+for (const needs of ['done', 'wake', 'photo', 'away 30m', 'wake, done, photo, away 30m']) {
+  test(`plain-text action lock (${needs}) points at Done`, async (t) => {
     const { DB, enable } = setup(t, '12:00');
     await enable(`12:00-12:20 wash face, brush teeth ! until ${needs}`);
     const response = await keepoutResponse(DB);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'text/plain; charset=utf-8');
-    assert.equal(await response.text(), `today keepout: wash face, brush teeth. ${action} to unlock.\n`);
+    assert.equal(await response.text(), 'today keepout: wash face, brush teeth. mark it done on today.lost.plus to unlock.\n');
   });
 }
 

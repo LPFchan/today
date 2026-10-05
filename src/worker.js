@@ -432,14 +432,9 @@ function truncateUtf8(text, maxBytes) {
 function keepoutText(routine) {
   const keepout = routine.today?.keepout;
   if (!keepout) return '';
-  const actions = {
-    done: 'mark it done on today.lost.plus', wake: "confirm you're up",
-    photo: 'send a meal photo', away: 'head out for a while',
-  };
   const name = keepout.name.replace(/\s+/g, ' ').trim();
-  if (keepout.needs.length) {
-    return `today keepout: ${name}. ${keepout.needs.map((need) => actions[need]).join(' and ')} to unlock.\n`;
-  }
+  // Temporary: Done is the only proof that works until proofs land.
+  if (keepout.needs.length) return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
   if (!keepout.until) return `today keepout: ${name}.\n`;
   const time = new Intl.DateTimeFormat('en-CA', {
     timeZone: routine.row?.tz ?? DEFAULT_PLACE.tz,
