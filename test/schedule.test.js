@@ -56,3 +56,31 @@ test('day state walks through a day', () => {
   assert.deepEqual(dayState(items, at(12)), { kind: 'finished', index: -1, completed: 2 });
   assert.deepEqual(dayState([], at(12)), { kind: 'empty', index: -1, completed: 0 });
 });
+
+
+test('consecutive same-start lines are moments and serialize without a full-day range', () => {
+  for (const text of [
+    '12:00 Wake\n12:00 Wash\n12:00 Teeth\n12:30-13:00 Lunch',
+    '23:00 Evening\n01:00 Moment\n01:00-02:00 Night',
+    '12:00 First\n12:00 Last',
+  ]) {
+    const items = parseSchedule(text);
+    const serialized = serializeSchedule(items);
+    assert.deepEqual(parseSchedule(serialized), items);
+    for (const item of items.filter(({ start, end }) => start === end)) {
+      assert.ok(serialized.split('\n').some((line) => line.endsWith(` ${item.name}`) && !line.split(' ')[0].includes('-')));
+    }
+  }
+  assert.equal(serializeSchedule(parseSchedule('12:00 Wake\n12:00 Wash\n12:30-13:00 Lunch')),
+    '12:00 Wake\n12:00-12:30 Wash\n12:30-13:00 Lunch');
+  // An explicit equal-clock range still means a full day.
+  assert.deepEqual(parseSchedule('12:00-12:00 Full day'), [{ start: 720, end: 2160, name: 'Full day' }]);
+});
+
+test('moments complete at their start and current-item selection skips them', () => {
+  const items = absoluteItems(parseSchedule('12:00 Wake\n12:00 Wash\n12:30 Lunch'), 0);
+  const noon = 12 * 60 * 60_000;
+  assert.deepEqual(dayState(items, noon - 1), { kind: 'waiting', index: 0, completed: 0 });
+  assert.deepEqual(dayState(items, noon), { kind: 'active', index: 1, completed: 1 });
+  assert.deepEqual(dayState(items, noon + 30 * 60_000), { kind: 'active', index: 2, completed: 2 });
+});

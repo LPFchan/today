@@ -5,7 +5,7 @@ import {
   parseRoutine, sunsetMinutes, zonedMidnight, zonedDate, placeRoutine,
   routineDay, routineSchedule, keepoutState, itemPhase,
 } from '../public/routine.js';
-import { parseSchedule, absoluteItems } from '../public/schedule.js';
+import { parseSchedule, absoluteItems, serializeSchedule } from '../public/schedule.js';
 
 const MINUTE = 60_000;
 const code = (fn) => {
@@ -87,7 +87,7 @@ test('every parse error has its code and source line', () => {
     ['12:00', 'noName', 1],
     ['12:00 ! until done', 'noName', 1],
     [`12:00 ${'x'.repeat(MAX_NAME + 1)}`, 'nameTooLong', 1],
-    ['12:00 a\n12:00 b', 'duplicate', 2],
+    ['12:00-13:00 a\n12:00-13:00 b', 'duplicate', 2],
     ['10:00 a\n09:00 b', 'backwards', 2],
     ['19:00 a\n18:00 b', 'backwards', 2],
     ['09:00-11:00 a\n10:00 b', 'overlap', 2],
@@ -104,14 +104,14 @@ test('every parse error has its code and source line', () => {
 
 test('default routine parses and rolls its overnight items into tomorrow', () => {
   const items = parseRoutine(DEFAULT_ROUTINE);
-  assert.equal(items.length, 7);
-  assert.equal(items[1].name, 'lunch');
+  assert.equal(items.length, 8);
+  assert.equal(items[2].name, 'lunch');
   const day = placeRoutine(items, '2026-10-05');
-  assert.equal(day.items[4].end, at(day, 26, 30));
-  assert.equal(day.items[5].start, at(day, 26, 30));
-  assert.equal(day.items[5].end, at(day, 27));
-  assert.equal(day.items[6].start, at(day, 27));
-  assert.equal(day.items[6].end, at(day, 36));
+  assert.equal(day.items[5].end, at(day, 26, 30));
+  assert.equal(day.items[6].start, at(day, 26, 30));
+  assert.equal(day.items[6].end, at(day, 27));
+  assert.equal(day.items[7].start, at(day, 27));
+  assert.equal(day.items[7].end, at(day, 36));
   assert.equal(day.ends, at(day, 36));
   const tomorrow = placeRoutine(items, '2026-10-06');
   assert.equal(day.ends, tomorrow.items[0].start);
@@ -123,7 +123,7 @@ test('rereading saved text skips annual placement but retains syntax validation'
   assert.deepEqual(code(() => placeRoutine(items, '2026-06-21')), ['overlap', 2]);
   for (const [text, expected] of [
     ['12:00 x ! until nope', 'badUntil'],
-    ['12:00 x\n12:00 y', 'duplicate'],
+    ['12:00-13:00 x\n12:00-13:00 y', 'duplicate'],
     ['24:00 x', 'badTime'],
   ]) assert.deepEqual(code(() => parseRoutine(text, DEFAULT_PLACE, { validate: false })), [expected, expected === 'duplicate' ? 2 : 1]);
 });
@@ -320,22 +320,23 @@ test('minimum lock time rejects premature completion and honors its exact bounda
 
 test('adjacent free blocks never lock and do not clear an overdue window', () => {
   const day = makeDay(DEFAULT_ROUTINE);
-  const outing = day.items[3];
-  const free = day.items[4];
+  const outing = day.items[4];
+  const free = day.items[5];
   assert.equal(outing.end, free.start);
-  assert.equal(free.end, day.items[5].start);
+  assert.equal(free.end, day.items[6].start);
   assert.equal(itemPhase(day, free, {}, free.start - 1), 'upcoming');
   assert.equal(itemPhase(day, free, {}, free.start), 'open');
   assert.equal(itemPhase(day, free, {}, free.end), 'past');
   const statuses = {
     [day.items[0].key]: { doneAt: day.items[0].end },
-    [day.items[1].key]: { startedAt: day.items[1].start, doneAt: day.items[1].end },
+    [day.items[1].key]: { doneAt: day.items[1].end },
+    [day.items[2].key]: { doneAt: day.items[2].end },
   };
   assert.equal(keepoutState(day, statuses, free.start + MINUTE).key, outing.key);
   statuses[outing.key] = { doneAt: free.start + MINUTE };
   assert.equal(keepoutState(day, statuses, free.start + MINUTE), null);
-  assert.equal(day.items[2].name, free.name);
-  assert.notEqual(day.items[2].key, free.key);
+  assert.equal(day.items[3].name, free.name);
+  assert.notEqual(day.items[3].key, free.key);
 });
 
 test('earliest lock wins, ties preserve item order, and no keepout means null', () => {
@@ -347,4 +348,40 @@ test('earliest lock wins, ties preserve item order, and no keepout means null', 
   const free = makeDay('12:00..13:00 free');
   assert.equal(keepoutState(free, {}, at(free, 12, 30)), null);
   assert.equal(itemPhase(free, free.items[0], {}, at(free, 13)), 'past');
+});
+
+
+test('same-start points remain consecutive moments and lock in listed order until the next instance', () => {
+  const day = makeDay('12:00 Wake ! until wake\n12:00 Wash ! until done\n12:00 Teeth ! until done\n12:30-13:00 Lunch');
+  assert.equal(routineSchedule(day).text, '12:00 Wake\n12:00 Wash\n12:00 Teeth\n12:30-13:00 Lunch');
+  assert.deepEqual(day.items.map(({ key }) => key), ['12:00', '12:00#2', '12:00#3', '12:30-13:00']);
+  const now = at(day, 16);
+  const statuses = {};
+  for (const item of day.items.slice(0, 3)) {
+    assert.equal(itemPhase(day, item, statuses[item.key], now), 'locked');
+    assert.equal(keepoutState(day, statuses, now).key, item.key);
+    statuses[item.key] = { doneAt: now };
+    assert.equal(itemPhase(day, item, statuses[item.key], now), 'done');
+  }
+  assert.equal(keepoutState(day, statuses, now), null);
+  assert.equal(keepoutState(day, {}, day.ends), null);
+  assert.equal(itemPhase(day, day.items[0], {}, day.ends), 'missed');
+});
+
+test('default routine places and its moment-containing plan round-trips every day of the year', () => {
+  const items = parseRoutine(DEFAULT_ROUTINE);
+  assert.deepEqual(items.slice(0, 3).map(({ name, until }) => ({ name, until })), [
+    { name: 'wake up', until: ['wake'] },
+    { name: 'wash face, brush teeth', until: ['done'] },
+    { name: 'lunch', until: ['photo'] },
+  ]);
+  for (let epoch = Date.parse('2026-01-01'); epoch < Date.parse('2027-01-01'); epoch += 24 * 60 * MINUTE) {
+    const day = placeRoutine(items, new Date(epoch).toISOString().slice(0, 10));
+    const plan = routineSchedule(day);
+    const restored = absoluteItems(parseSchedule(plan.text), plan.anchor);
+    assert.equal(restored.length, items.length);
+    assert.equal(restored[0].start, restored[0].end);
+    assert.deepEqual(restored, day.items.map(({ start, end, name }) => ({ start, end, name })));
+    assert.deepEqual(parseSchedule(serializeSchedule(parseSchedule(plan.text))), parseSchedule(plan.text));
+  }
 });

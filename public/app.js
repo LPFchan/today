@@ -306,7 +306,7 @@ function renderAgenda(day) {
     li.append(
       Object.assign(document.createElement('span'), {
         className: 'agenda-time',
-        textContent: `${clock(item.start)}–${clock(item.end)}`,
+        textContent: timeRange(item, clock),
       }),
       Object.assign(document.createElement('span'), { className: 'agenda-name', textContent: item.name }),
       Object.assign(document.createElement('span'), { className: 'agenda-state', textContent: status }),
@@ -390,7 +390,7 @@ function renderLane(items, now, range) {
     else if (now >= item.start) block.classList.add('is-now');
     block.style.left = pct(start);
     block.style.width = `calc(${pct(end)} - ${pct(start)})`;
-    block.title = `${clock(item.start)}–${clock(item.end)} ${item.name}`;
+    block.title = `${timeRange(item, clock)} ${item.name}`;
     lane.append(block);
   }
   lane.append(Object.assign(node('span', 'now-mark'), { style: `left:${pct(now)}` }));
@@ -451,7 +451,7 @@ function renderBoard() {
       const detail = node('ol', 'person-detail');
       for (const item of person.items) {
         const row = node('li', now >= item.end ? 'is-past' : now >= item.start ? 'is-now' : '');
-        row.append(node('span', 'agenda-time', `${clock(item.start)}–${clock(item.end)}`), node('span', '', item.name));
+        row.append(node('span', 'agenda-time', timeRange(item, clock)), node('span', '', item.name));
         detail.append(row);
       }
       li.append(detail);
@@ -515,6 +515,11 @@ function clearError() {
   el.planInput.removeAttribute('aria-invalid');
 }
 
+/** "12:00–13:00", or just "12:00" for a moment (a line sharing the next one's start). */
+function timeRange(item, format) {
+  return item.end > item.start ? `${format(item.start)}–${format(item.end)}` : format(item.start);
+}
+
 function duration(minutes) {
   const h = Math.floor(minutes / 60);
   const m = minutes % 60;
@@ -551,10 +556,10 @@ function renderPreview() {
       li.append(
         Object.assign(document.createElement('span'), {
           className: 'preview-time',
-          textContent: `${formatClock(item.start)}–${formatClock(item.end)}`,
+          textContent: timeRange(item, formatClock),
         }),
         Object.assign(document.createElement('span'), { className: 'preview-name', textContent: item.name }),
-        Object.assign(document.createElement('span'), { className: 'preview-length', textContent: duration(item.end - item.start) }),
+        Object.assign(document.createElement('span'), { className: 'preview-length', textContent: item.end > item.start ? duration(item.end - item.start) : '' }),
       );
       return li;
     }),

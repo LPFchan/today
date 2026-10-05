@@ -13,7 +13,8 @@ import { ScheduleError, absoluteItems, parseSchedule } from './schedule.js';
 export const MAX_LINES = 60;
 export const MAX_NAME = 80;
 export const DEFAULT_PLACE = { tz: 'Asia/Seoul', lat: 37.5665, lon: 126.978 };
-export const DEFAULT_ROUTINE = `12:00-12:20 wake up, wash face, brush teeth ! until wake, done
+export const DEFAULT_ROUTINE = `12:00 wake up ! until wake
+12:00 wash face, brush teeth ! until done
 12:30..14:00 lunch ! until photo
 14:00-sunset-1h free time
 sunset-1h..sunset evening outing and dinner ! until away 30m, photo
@@ -168,14 +169,14 @@ export function parseRoutine(text, place = DEFAULT_PLACE, { validate = true } = 
   const lines = String(text).split(/\r?\n/);
   if (lines.length > MAX_LINES * 2) throw new RoutineError('tooLong');
   const items = [];
-  const keys = new Set();
+  const keys = new Map();
   lines.forEach((raw, index) => {
     const line = index + 1;
     const source = raw.trim();
     if (!source || source.startsWith('#')) return;
     const split = source.search(/\s/);
-    const key = split < 0 ? source : source.slice(0, split);
-    const match = key.match(WHEN);
+    const token = split < 0 ? source : source.slice(0, split);
+    const match = token.match(WHEN);
     if (!match) throw new RoutineError('unreadable', line);
     const start = time(match[1], line);
     const end = match[3] ? time(match[3], line) : null;
@@ -211,8 +212,10 @@ export function parseRoutine(text, place = DEFAULT_PLACE, { validate = true } = 
     }
     const kind = match[2] === '..' ? 'window' : 'fixed';
     if (kind === 'window' && keepout && !until.length) throw new RoutineError('badUntil', line);
-    if (keys.has(key)) throw new RoutineError('duplicate', line);
-    keys.add(key);
+    const count = (keys.get(token) ?? 0) + 1;
+    if (count > 1 && end !== null) throw new RoutineError('duplicate', line);
+    keys.set(token, count);
+    const key = count === 1 ? token : `${token}#${count}`;
     const item = { key, name, kind, start, end, keepout, until, awayMinutes, minMinutes };
     linesByItem.set(item, line);
     items.push(item);
@@ -315,7 +318,9 @@ export function routineSchedule(day) {
   const text = day.items.map((item) => {
     const start = Math.round((item.start - day.anchor) / MINUTE);
     const end = Math.round((item.end - day.anchor) / MINUTE);
-    return `${clock(start)}-${clock(end)} ${item.name}`;
+    const token = WHEN.exec(item.key.split('#')[0]);
+    const time = token && !token[3] ? clock(start) : `${clock(start)}-${clock(end)}`;
+    return `${time} ${item.name}`;
   }).join('\n');
   return { text, anchor: day.anchor };
 }

@@ -29,7 +29,9 @@ flash-and-chime when an item ends.
 - `today.lost.plus/routine` — auto-routine, opt-in and unlinked: a recurring
   routine (`public/routine.js` format) that writes each day's plan, with
   keepout items that lock until done. Turning it on is self-serve; turning
-  it off goes through Hermes.
+  it off goes through Hermes. Start-only lines end at the next line’s start;
+  same-start moments retain their names and lock in listed order. Days off
+  suppress locks and plan writes.
 - Pebble app (`watch/`) — read-only timer for your own plan, paired by QR code.
 - Mac menu bar app (`mac/`) — read-only timer for you or anyone on the board,
   signed in through the browser; notifies when anyone's next item starts;
@@ -55,6 +57,8 @@ flash-and-chime when an item ends.
   an empty body when free, or one newline-terminated `today keepout:` line
   naming the item and how to unlock it (Done, for now), or its unlock time as
   HH:MM in the routine's timezone. Errors retain their JSON shape and status.
+- `PUT /api/routine/away {day, away, reason}` sets days off only after the current
+  routine day; `GET /api/routine` lists days off from the current day onward.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
   tokens for resource `https://today.lost.plus/mcp`, scope `today`; the
   gateway accepts those only on `/api/watch` and `/api/board`.
