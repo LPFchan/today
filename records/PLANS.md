@@ -45,38 +45,15 @@ the board, the watch or the Mac app.
 
 ### Near Term
 
-- Phase 2 — Mac overlay:
-  - Why now: the first real enforcement.
-  - Dependencies: phase 1; an auth gateway route that lets the Mac app's
-    `today` token mark its owner's routine items started or done (today the
-    Mac app is read-only).
-  - Scope: full-screen overlay over every display while keepout is due,
-    showing the item and what unlocks it, with a "done" button.
-    Until phase 6 lands, wake-up, meals and the outing can also complete
-    with the same "done" button, so no lock can become impossible to lift
-    before both proofs and bypasses exist.
-  - Related ids: DEC-20261005-001
-- Phase 3 — agent keepout:
-  - Why now: closes the "code over SSH from another machine" gap.
-  - Dependencies: phases 1–2 (the overlay's "done" button is how a keepout item ends); a token the check can use to read keepout state from any machine; operator approval of the global agent-instructions edit.
-  - Scope: no new CLI. Each harness hook runs a one-line `curl` to
-    `today.lost.plus/api/keepout`, which answers plain text (empty when free,
-    the lock line otherwise); a lock drops the prompt before the model sees
-    it, and an unreachable today lets the prompt through. Hooks: Claude Code
-    `UserPromptSubmit`, Codex `hooks.json` `UserPromptSubmit`, Gemini
-    `BeforeAgent`, OpenCode tool-call blocking; the global agent instructions
-    cover harnesses without hooks. Hermes and long-running autonomous jobs
-    are exempt.
-  - Related ids: DEC-20261005-001
-
-### Mid Term
-
 - Phase 4 — wake-up alarm in brief:
-  - Why later: needs the overlay to acknowledge against.
+  - Why now: the overlay it acknowledges against has shipped.
   - Dependencies: phases 1–2.
   - Scope: at 12:00, SSH to the MacBook, unmute, set volume, play audio until
     acknowledged; fall back to dumpling when the MacBook is unreachable.
   - Related ids: DEC-20261005-001
+
+### Mid Term
+
 - Phase 5 — proofs in brief:
   - Why later: needs item status in today to write into.
   - Dependencies: phase 1; findmy-mcp on dumpling; an auth gateway route and

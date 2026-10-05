@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-05:
+  - Change: phases 2 and 3 of the routine plan ship. mac-v2.0.0 covers every display during keepout and holds keyboard focus; setup's harness hooks (Claude Code, Codex, Kimi) drop prompts while `/api/keepout` reports a lock, using its new plain-text answer.
+  - Why it matters: a keepout now locks the Mac and the coding agents; the AGENTS.md keepout section covers harnesses without hooks.
+
+- 2026-10-05:
   - Change: auto-routine (phase 1 of the routine plan) ships at `/routine`: the routine writes each day's plan, `/api/keepout` reports the current lock, items unlock with a Done button until proofs land.
   - Why it matters: the operator's routine runs itself; the Mac overlay (phase 2) and agent keepout (phase 3) read `/api/keepout`.
 
