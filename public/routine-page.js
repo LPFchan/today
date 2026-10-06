@@ -293,7 +293,8 @@ async function mutate(method, path, body, inEditor = false) {
   updateControls();
   try {
     accept(await request(method, path, body), body.text);
-    message.textContent = body.enabled ? t('routineTurnedOn')
+    // The toggle itself shows that auto-routine is on.
+    message.textContent = body.enabled ? ''
       : body.text !== undefined
         ? routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : t('routineSaved')
         : t('routineUpdated');
