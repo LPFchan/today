@@ -274,6 +274,14 @@ async function currentRoutine(env, me, now = Date.now()) {
   row = fresh;
   result.row = row;
   await observeRoutine(env, me.sub, row, day, now, false);
+  const observed = await env.DB.prepare(
+    'SELECT stopped_at FROM routine_days WHERE sub = ?1 AND day = ?2 AND instance = ?3',
+  ).bind(me.sub, day.day, row.instance).first();
+  if (observed?.stopped_at != null) {
+    // Hermes skipped the rest of this day: nothing locks until the next one.
+    result.today = { day: day.day, items: [], keepout: null, skipped: true };
+    return result;
+  }
   const { results } = await env.DB.prepare(
     'SELECT key, started_at, done_at, proofs FROM routine_status WHERE sub = ?1 AND day = ?2',
   ).bind(me.sub, day.day).all();
@@ -337,9 +345,9 @@ function affordanceReceipt(row) {
 }
 
 /** POST /api/routine/affordance contract (gateway: exact mcp route, today scope).
- * Request: {action:'bypass'|'off', day:'YYYY-MM-DD', key?:string,
+ * Request: {action:'bypass'|'skip_day'|'off', day:'YYYY-MM-DD', key?:string,
  *   reason:string, requestId:UUID}. Bypass requires key (1..100 UTF-16 units);
- * off omits key. Reason is nonblank, <=200 Unicode code points. No extra fields.
+ * skip_day and off omit key. skip_day ends today's locks and keeps the routine on. Reason is nonblank, <=200 Unicode code points. No extra fields.
  * 200: {receipt:{requestId,action,day,key:string|null,reason,at:epochMs,instance}}.
  * Receipts are first-write, subject-scoped and stable across rollover/off.
  * 400 bad_request; 401 unauthenticated; 409 not_due|locked|state_changed|
@@ -349,12 +357,12 @@ function affordanceReceipt(row) {
  */
 async function routineAffordance(request, env, me) {
   const body = await request.json().catch(() => null);
-  if (!body || Array.isArray(body) || !['bypass', 'off'].includes(body.action) || !validDay(body.day)
+  if (!body || Array.isArray(body) || !['bypass', 'skip_day', 'off'].includes(body.action) || !validDay(body.day)
       || typeof body.reason !== 'string' || !body.reason.trim() || [...body.reason].length > 200
       || typeof body.requestId !== 'string'
       || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)
       || (body.action === 'bypass' && (typeof body.key !== 'string' || !body.key || body.key.length > 100))
-      || (body.action === 'off' && Object.hasOwn(body, 'key'))
+      || (body.action !== 'bypass' && Object.hasOwn(body, 'key'))
       || Object.keys(body).some((key) => !['action', 'day', 'key', 'reason', 'requestId'].includes(key))) {
     return json(400, { error: 'bad_request' });
   }
@@ -369,7 +377,8 @@ async function routineAffordance(request, env, me) {
   if (previous) return receiptResponse(previous);
   const routine = await currentRoutine(env, me, Date.now());
   const now = Date.now();
-  if (!routine.row?.enabled || !routine.day || body.day !== routine.day.day || now >= routine.day.ends) {
+  if (!routine.row?.enabled || !routine.day || body.day !== routine.day.day || now >= routine.day.ends
+      || (routine.today?.skipped && body.action !== 'off')) {
     return json(409, { error: 'not_due' });
   }
   if (body.action === 'bypass') {
@@ -393,6 +402,13 @@ async function routineAffordance(request, env, me) {
   ).bind(me.sub, requestId, payload, body.action, body.day, key, body.reason, now,
     routine.row.revision, routine.row.enabled_at);
   const statements = [insert];
+  if (body.action === 'skip_day') {
+    statements.push(env.DB.prepare(
+      'UPDATE routine_days SET stopped_at = ?4 WHERE sub = ?1 AND day = ?5 AND instance = ?6 ' +
+        'AND stopped_at IS NULL AND EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 ' +
+        'AND request_id = ?2 AND payload = ?3 AND at = ?4)',
+    ).bind(me.sub, requestId, payload, now, body.day, routine.row.instance));
+  }
   if (body.action === 'off') {
     // The event, stop boundary and off switch commit together, or not at all.
     const accepted = 'EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND request_id = ?2 ' +
@@ -616,7 +632,8 @@ function routineWriteGuard(instance, text) {
   return 'FROM routines WHERE sub = ?1 AND enabled = 1 AND materialized_day = ?2 ' +
     `AND instance = ?${instance} AND text = ?${text} ` +
     'AND NOT EXISTS (SELECT 1 FROM routine_away WHERE sub = ?1 AND day = ?2) ' +
-    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass')";
+    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass') " +
+    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND instance = routines.instance AND action = 'skip_day')";
 }
 
 /** Select the current proof-bearing item without skipping an earlier lock. */

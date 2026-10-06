@@ -129,7 +129,8 @@ function render() {
   $('routinePending').textContent = routine.pendingFrom ? t('routinePending', { date: pendingDate(routine.pendingFrom) }) : '';
 
   $('routineItemsEmpty').hidden = Boolean(today?.items.length);
-  $('routineItemsEmpty').textContent = t(routine.enabled ? 'routineNoItems' : 'routineOff');
+  $('routineItemsEmpty').textContent = t(!routine.enabled ? 'routineOff'
+    : today?.skipped ? 'routineSkippedToday' : 'routineNoItems');
   const list = $('routineItems');
   list.replaceChildren();
   const current = nowKey();

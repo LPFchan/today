@@ -74,14 +74,15 @@ flash-and-chime when an item ends.
   window's start and post with its day/key. Proofs retain today's and yesterday's
   progress only.
 - `POST /api/routine/affordance {action, day, key?, reason, requestId}` accepts
-  explicit current-day `bypass` or `off` controls. Bypass uses the exact item key;
-  off omits it. The gateway requires the shared Today bearer token. Atomic receipts
+  explicit current-day `bypass`, `skip_day` or `off` controls. Bypass uses the exact
+  item key; skip_day and off omit it. skip_day ends the rest of the current routine
+  day's locks and keeps the routine on; the next day locks as usual. The gateway requires the shared Today bearer token. Atomic receipts
   bind subject, day and numeric routine instance; identical retries preserve the
   receipt. Re-enable creates a fresh instance and clears live progress.
 - `GET /api/routine/report?day=YYYY-MM-DD` exposes private observed routine history
   for seven elapsed days after each instance ends. Incomplete days return 409;
   absent observations are missing coverage, never fabricated misses. Reports retain
-  deadline misses after late completion and distinguish bypass, off and recovery.
+  deadline misses after late completion and distinguish bypass, skip_day, off and recovery.
 - `PUT /api/routine/away {day, away, reason}` sets days off only after the current
   routine day; `GET /api/routine` lists days off from the current day onward.
 - The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
