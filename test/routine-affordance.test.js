@@ -313,6 +313,31 @@ test('a delayed proof cannot mutate a bypassed item or a switched-off routine', 
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
 });
 
+test('a delayed proof cannot land after skip_day', async (t) => {
+  const { enable, call, skipDay, DB } = setup(t);
+  await enable();
+  const prepare = DB.prepare.bind(DB);
+  let pause;
+  let resume;
+  const paused = new Promise((resolve) => { pause = resolve; });
+  const resumed = new Promise((resolve) => { resume = resolve; });
+  t.mock.method(DB, 'prepare', (sql) => {
+    const statement = prepare(sql);
+    if (!sql.startsWith('INSERT INTO routine_status (sub, day, key, proofs)')) return statement;
+    return { ...statement, bind: (...values) => {
+      const bound = statement.bind(...values);
+      return { ...bound, run: async () => { pause(); await resumed; return bound.run(); } };
+    } };
+  });
+  const proof = call('POST', '/api/routine/proof', { proof: 'wake', day: '2026-10-05', key: '12:00' });
+  await paused;
+  try {
+    assert.equal((await skipDay()).status, 200);
+  } finally { resume(); }
+  assert.equal((await proof).body.error, 'state_changed');
+  assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
+});
+
 test('off/edit/re-enable preserves earlier snapshots and never transfers bypass to a revised item', async (t) => {
   const { enable, bypass, off, call, at, report, DB } = setup(t, '13:00');
   const old = '12:30..14:00 Meal ! until photo';

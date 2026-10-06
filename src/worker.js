@@ -632,7 +632,8 @@ function routineWriteGuard(instance, text) {
   return 'FROM routines WHERE sub = ?1 AND enabled = 1 AND materialized_day = ?2 ' +
     `AND instance = ?${instance} AND text = ?${text} ` +
     'AND NOT EXISTS (SELECT 1 FROM routine_away WHERE sub = ?1 AND day = ?2) ' +
-    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass')";
+    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass') " +
+    "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND instance = routines.instance AND action = 'skip_day')";
 }
 
 /** Select the current proof-bearing item without skipping an earlier lock. */
