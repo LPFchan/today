@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-06:
+  - Change: Hermes can skip the rest of today: the `skip_day` affordance from PR #17 (`0c556cf`) is deployed with D1 migration 0007 and Worker version `522633c5-af71-4368-84ac-c98c84823217`. Brief's single `routine_skip` Hermes tool (item, rest of today, future dates, off) is installed on Grimoire.
+  - Why it matters: one conversational skip control covers every granularity; the web page still cannot skip the current day. A live Hermes request called `routine_skip` directly and got `not_due` while auto-routine is off. Activation remains gated.
+
+- 2026-10-06:
   - Change: operator-approved mac-v2.1.1 is published from `97263fa`; its signed `Today.dmg` and Sparkle feed entry (build 54) are available. GitHub Actions run `37417299966` passed decoding/cache tests, build, UI snapshots, signing, publication and feed update.
   - Why it matters: the Mac alarm stops when wake proof arrives, and unlock instructions show only outstanding proofs. Installation on individual Macs remains unverified. Auto-routine stays off and Done remains available.
 
