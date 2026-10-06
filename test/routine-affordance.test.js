@@ -31,6 +31,8 @@ function setup(t, time = '12:00') {
       { action: 'bypass', day: '2026-10-05', key, reason: 'Sick today', requestId: id(n), ...extra }),
     off: (n = 1) => call('POST', '/api/routine/affordance',
       { action: 'off', day: '2026-10-05', reason: 'Rest today', requestId: id(n) }),
+    skipDay: (n = 1, day = '2026-10-05') => call('POST', '/api/routine/affordance',
+      { action: 'skip_day', day, reason: 'Sick today', requestId: id(n) }),
     report: (day = '2026-10-05', sub = 'owner') => call('GET', `/api/routine/report?day=${day}`, undefined, sub),
   };
 }
@@ -146,6 +148,42 @@ test('off releases keepout atomically, retains receipt and denies self-service o
   assert.equal(result.status, 200);
   assert.equal(result.body.events[0].action, 'off');
   assert.ok(result.body.instances[0].items.slice(2).every((item) => item.outcome === 'skipped'));
+});
+
+test('skip_day releases today, keeps the routine on and locks again tomorrow', async (t) => {
+  const { enable, skipDay, bypass, off, call, DB, at, report } = setup(t);
+  await enable();
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00');
+  assert.equal((await call('POST', '/api/routine/affordance', {
+    action: 'skip_day', day: '2026-10-05', key: '12:00', reason: 'Sick', requestId: id(),
+  })).status, 400);
+  const first = await skipDay();
+  assert.equal(first.status, 200);
+  assert.equal(first.body.receipt.action, 'skip_day');
+  assert.equal(first.body.receipt.key, null);
+  const routine = (await call('GET', '/api/routine')).body;
+  assert.equal(routine.enabled, true);
+  assert.deepEqual(routine.today, { day: '2026-10-05', items: [], keepout: null, skipped: true });
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  assert.equal((await call('GET', '/api/keepout?proof=photo')).body.item, null);
+  assert.deepEqual(await skipDay(), first);
+  assert.equal((await skipDay(2)).body.error, 'not_due');
+  assert.equal((await bypass('12:00', 3)).body.error, 'not_due');
+  assert.equal(DB.raw.prepare('SELECT stopped_at FROM routine_days').get().stopped_at, Date.now());
+  at('12:00', '2026-10-06');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.key, '12:00');
+  const result = await report();
+  assert.equal(result.body.events[0].action, 'skip_day');
+  assert.ok(result.body.instances[0].items.every((item) => ['released', 'skipped'].includes(item.outcome)));
+  assert.equal((await off(4)).status, 409);
+});
+
+test('off still works after skip_day on the same day', async (t) => {
+  const { enable, skipDay, off, call } = setup(t);
+  await enable();
+  assert.equal((await skipDay()).status, 200);
+  assert.equal((await off(2)).status, 200);
+  assert.equal((await call('GET', '/api/routine')).body.enabled, false);
 });
 
 test('reports and receipts are scoped to gateway subject', async (t) => {
