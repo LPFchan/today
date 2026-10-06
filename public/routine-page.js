@@ -268,10 +268,9 @@ async function refresh() {
   try {
     accept(await request('GET', '/api/routine'));
     retry.hidden = true;
-    if (message.dataset.failure === 'true' || message.dataset.t === 'routineLoading') {
+    if (message.dataset.failure === 'true') {
       message.textContent = '';
       message.classList.remove('is-error');
-      delete message.dataset.t;
       delete message.dataset.failure;
     }
   } catch (error) {
