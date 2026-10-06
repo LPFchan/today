@@ -220,6 +220,13 @@ svg {
   align-items: center;
   gap: 12px;
   padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+  background: var(--bg);
+}
+
+@supports selector(:has(*)) {
+  .topbar {
+    background: transparent;
+  }
 }
 
 /* Content scrolling under the bar blurs progressively toward the top: a light
