@@ -41,41 +41,14 @@ Product rule for every phase: routine and keepout are opt-in per person and
 off by default. Users who haven't opted in (marie) see no change on the web,
 the board, the watch or the Mac app.
 
-Last gate: the operator turns auto-routine on only after phases 4–6 ship, so
-every lock has a working way out (proofs, Hermes bypasses, switching off)
-before it binds.
-
 ## Sequencing
 
 ### Near Term
 
-- Phase 5 — proofs in brief:
-  - Why now: item status and the alarm are in place; proofs are the next way out of a lock.
-  - Available foundation: Today proof storage/eligibility and the Common Auth
-    bearer proof route are deployed; Find My is reachable on dumpling.
-  - Remaining dependencies: verify the private home mapping and connect the landed
-    private meal/nutrition implementation to trusted Telegram transport. Brief's
-    vacuum evidence reporter is landed; vendor history cannot certify the exact
-    room and three passes, so delivery must preserve that uncertainty.
-    Mac proof-aware source also needs an operator-approved release before distribution.
-  - Scope: meal photos over Telegram judged by the Hermes model (meal or not,
-    calorie estimate); 30+ minutes away from home via Find My; results posted
-    to today to lift the lock. When Find My sees the operator leave home for
-    the outing, brief starts the Roborock through python-roborock (the
-    library Home Assistant uses) and checks the run finished. The Roborock
-    has no schedule of its own; brief is the only thing that runs it.
-  - Related ids: DEC-20261005-001
-
-### Mid Term
-
-- Phase 6 — away mode and affordances:
-  - Why later: bypasses matter once the lock is real.
-  - Available foundation: Today's scoped affordance/report APIs and shared-token
-    Common Auth routes are deployed.
-  - Dependencies: phases 1, 4, 5 (every proof exists before the temporary
-    "done" path goes away); tested Hermes tool wiring and confirmed report delivery.
-  - Scope: days off from the calendar already ship (phase 4); a Hermes tool that grants one
-    item for today only, or switches auto-routine off (DEC-20261005-002), with
-    a guideline to weigh the request; brief reports
-    misses and bypasses each morning.
-  - Related ids: DEC-20261005-001
+- Phase 6 — finish the escape hatches:
+  - Why now: auto-routine is live and every proof and Hermes control works; Done
+    is still the temporary fallback for every item.
+  - Remaining: retire Done for photo, away and wake items once the operator trusts
+    the proofs in daily use; confirm the morning brief's delivery so reported
+    misses and skips are acknowledged once.
+  - Related ids: DEC-20261005-001, DEC-20261005-002

@@ -4,9 +4,9 @@
 
 - Last updated: 2026-10-06
 - Overall posture: `active`
-- Current focus: first real use by the operator and marie, on the web, the watch and the Mac
+- Current focus: the operator's first days on auto-routine; marie's first sign-ins
 - Highest-priority blocker: none
-- Next operator decision needed: none
+- Next operator decision needed: when Done stops satisfying proof items (the rest of phase 6)
 - Related decisions: DEC-20260923-003, DEC-20260925-001, DEC-20261005-001, DEC-20261005-002
 
 ## Current State Summary
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-06:
+  - Change: the operator turned auto-routine on with the default routine. Every way out of a lock is live: wake alarm (mac-v2.1.1, dumpling fallback), meal photos and skips through Hermes (`meal_judgment`, `routine_skip`), the Find My outing proof with the room-only Roborock clean, and calendar days off. Brief's morning brief adds routine history, vacuum status and Monday's weekly time outside. The routine page no longer shows loading or turned-on status lines (PRs #18, #19).
+  - Why it matters: the routine now binds. Done still satisfies every item as the temporary fallback; the first live day tests the 12:00 alarm, the sunset outing clean and a meal unlock.
 
 - 2026-10-06:
   - Change: Hermes can skip the rest of today: the `skip_day` affordance from PR #17 (`0c556cf`) is deployed with D1 migration 0007 and Worker version `522633c5-af71-4368-84ac-c98c84823217`. Brief's single `routine_skip` Hermes tool (item, rest of today, future dates, off) is installed on Grimoire.
@@ -96,8 +100,8 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 
 ## Immediate Next Steps
 
-- Next: install today.dmg and sign in end to end.
+- Next: check the first live auto-routine day: the 12:00 wake alarm, the sunset outing and its room-only clean, and a meal photo unlocking lunch.
   - Owner: operator
-  - Trigger: mac-v1.0.0 is up.
-  - Related ids: DEC-20260923-003
+  - Trigger: the routine day starting 2026-10-07 12:00.
+  - Related ids: DEC-20261005-001
 
