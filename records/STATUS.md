@@ -17,8 +17,8 @@ Worker (D1 `today`), hub registry row `today.lost.plus` (alias and scope
 answer in production. The Pebble app signs in through the hub's device login;
 Marie's watch is paired and reading its plan.
 
-The Mac menu bar app is released as mac-v1.0.0 (`today.dmg` on GitHub, Sparkle
-feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
+The Mac menu bar app is released as mac-v2.1.1 (`Today.dmg` on GitHub, signed
+Sparkle feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
 feed, and its sign-in reaches the hub's login page over a loopback port; a
 full sign-in with an account hasn't happened yet. The gateway accepts the
 `today` token on `/api/board` (LPFchan/auth cd00b05, deployed).
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-06:
+  - Change: operator-approved mac-v2.1.1 is published from `97263fa`; its signed `Today.dmg` and Sparkle feed entry (build 54) are available. GitHub Actions run `37417299966` passed decoding/cache tests, build, UI snapshots, signing, publication and feed update.
+  - Why it matters: the Mac alarm stops when wake proof arrives, and unlock instructions show only outstanding proofs. Installation on individual Macs remains unverified. Auto-routine stays off and Done remains available.
 
 - 2026-10-06:
   - Change: the plan dialog’s compact auto-routine indicator and settings link are deployed from PR #16 (`5e7e49e`), Worker version `1fcccb24-42ad-4339-865c-5ad704782ae7`. Enabled routines grey out daily editing and disable Save/Start and Clear; preview and visibility remain available.
