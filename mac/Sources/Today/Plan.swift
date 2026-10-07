@@ -5,8 +5,10 @@ struct Item: Decodable, Hashable {
     let start: Date
     let end: Date
     let name: String
+    /// When this item's keepout locks; only on your own items.
+    var lock: Date? = nil
 
-    private enum CodingKeys: String, CodingKey { case start, end, name }
+    private enum CodingKeys: String, CodingKey { case start, end, name, lock }
 
     // The board sends epoch milliseconds.
     init(from decoder: Decoder) throws {
@@ -14,12 +16,14 @@ struct Item: Decodable, Hashable {
         start = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .start) / 1000)
         end = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .end) / 1000)
         name = try c.decode(String.self, forKey: .name)
+        lock = try c.decodeIfPresent(Double.self, forKey: .lock).map { Date(timeIntervalSince1970: $0 / 1000) }
     }
 
-    init(start: Date, end: Date, name: String) {
+    init(start: Date, end: Date, name: String, lock: Date? = nil) {
         self.start = start
         self.end = end
         self.name = name
+        self.lock = lock
     }
 }
 

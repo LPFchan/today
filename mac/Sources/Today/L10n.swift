@@ -29,6 +29,7 @@ enum L10n {
     ]
 
     private static let ko: [String: String] = [
+        "Keepout from %@": "%@부터 잠금",
         "Not yet": "아직이에요",
         "Keepout now": "지금 잠금",
         "Unlocks at %@": "%@에 풀려요",
@@ -93,6 +94,7 @@ enum L10n {
     ]
 
     private static let ja: [String: String] = [
+        "Keepout from %@": "%@からキープアウト",
         "Today": "Today",
         "Loading…": "読み込み中…",
         "Until %@": "%@まで",
@@ -150,6 +152,7 @@ enum L10n {
     ]
 
     private static let zhHans: [String: String] = [
+        "Keepout from %@": "%@ 起锁定",
         "Today": "Today",
         "Loading…": "加载中…",
         "Until %@": "直到 %@",
@@ -207,6 +210,7 @@ enum L10n {
     ]
 
     private static let zhHant: [String: String] = [
+        "Keepout from %@": "%@ 起鎖定",
         "Today": "Today",
         "Loading…": "載入中…",
         "Until %@": "直到 %@",
@@ -264,6 +268,7 @@ enum L10n {
     ]
 
     private static let es: [String: String] = [
+        "Keepout from %@": "Bloqueo desde las %@",
         "Today": "Today",
         "Loading…": "Cargando…",
         "Until %@": "Hasta %@",
@@ -321,6 +326,7 @@ enum L10n {
     ]
 
     private static let fr: [String: String] = [
+        "Keepout from %@": "Verrouillage à partir de %@",
         "Today": "Today",
         "Loading…": "Chargement…",
         "Until %@": "Jusqu’à %@",
@@ -378,6 +384,7 @@ enum L10n {
     ]
 
     private static let de: [String: String] = [
+        "Keepout from %@": "Sperre ab %@",
         "Today": "Today",
         "Loading…": "Wird geladen…",
         "Until %@": "Bis %@",
@@ -435,6 +442,7 @@ enum L10n {
     ]
 
     private static let pt: [String: String] = [
+        "Keepout from %@": "Bloqueio a partir das %@",
         "Today": "Today",
         "Loading…": "Carregando…",
         "Until %@": "Até %@",
@@ -492,6 +500,7 @@ enum L10n {
     ]
 
     private static let it: [String: String] = [
+        "Keepout from %@": "Blocco dalle %@",
         "Today": "Today",
         "Loading…": "Caricamento…",
         "Until %@": "Fino alle %@",
@@ -549,6 +558,7 @@ enum L10n {
     ]
 
     private static let nl: [String: String] = [
+        "Keepout from %@": "Vergrendeling vanaf %@",
         "Today": "Today",
         "Loading…": "Laden…",
         "Until %@": "Tot %@",
@@ -606,6 +616,7 @@ enum L10n {
     ]
 
     private static let sv: [String: String] = [
+        "Keepout from %@": "Spärr från %@",
         "Today": "Today",
         "Loading…": "Laddar…",
         "Until %@": "Till %@",
