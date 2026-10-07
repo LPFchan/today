@@ -17,7 +17,7 @@ Worker (D1 `today`), hub registry row `today.lost.plus` (alias and scope
 answer in production. The Pebble app signs in through the hub's device login;
 Marie's watch is paired and reading its plan.
 
-The Mac menu bar app is released as mac-v2.1.3 (`Today.dmg` on GitHub, signed
+The Mac menu bar app is released as mac-v2.1.4 (`Today.dmg` on GitHub, signed
 Sparkle feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
 feed, and its sign-in reaches the hub's login page over a loopback port; a
 full sign-in with an account hasn't happened yet. The gateway accepts the
@@ -37,7 +37,7 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 
 - 2026-10-07:
   - Change: the Mac panel no longer slides sideways when you switch people; the menu bar keeps the timer it had when the panel opened and switches after it closes (PR #26, `a12acf8`).
-  - Why it matters: the menu bar item changes width with the timer and the panel is anchored to it. Built by mac CI only; not yet released or tried on a real Mac.
+  - Why it matters: the menu bar item changes width with the timer and the panel is anchored to it. Checked on dumpling with a debug build that switched people from inside the app (not real clicks). Operator-approved mac-v2.1.4 is published from `495b0c8` (Sparkle build 72, run `37637480840`).
 
 - 2026-10-07:
   - Change: Hermes can skip an open window early, before it locks: `GET /api/keepout?open` names it (PR #25, Worker `20c132d6`) and brief's `routine_skip` item scope uses it when nothing is locked (brief PR #21, Hermes gateway restarted).
