@@ -5,8 +5,8 @@ import { DEFAULT_ROUTINE, parseRoutine, routineDay, routineSchedule } from '../p
 import { testDatabase } from './d1.js';
 
 const ORIGIN = 'https://today.lost.plus';
-const ROUTINE = `12:00-12:20 Wake ! until wake, done
-12:30..14:00 Meal ! until photo; min 20m
+const ROUTINE = `12:00-12:20 Wake ! until done
+12:30..14:00 Meal ! until done; min 20m
 14:00-02:30 Free
 02:30-12:00 Sleep !`;
 const instant = (time, day = '2026-10-05') => Date.parse(`${day}T${time}:00+09:00`);
@@ -82,15 +82,15 @@ test('plain-text time locks use HH:MM in the routine timezone', async (t) => {
   assert.equal(await response.text(), 'today keepout: sleep until 12:00. try again then.\n');
 });
 
-// Done unlocks every proof until proofs land.
 for (const needs of ['done', 'wake', 'photo', 'away 30m', 'wake, done, photo, away 30m']) {
-  test(`plain-text action lock (${needs}) points at Done`, async (t) => {
+  const unlock = needs === 'done' ? 'mark it done on today.lost.plus' : 'send its proof to Hermes';
+  test(`plain-text action lock (${needs}) says to ${unlock}`, async (t) => {
     const { DB, enable } = setup(t, '12:00');
     await enable(`12:00-12:20 wash face, brush teeth ! until ${needs}`);
     const response = await keepoutResponse(DB);
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('content-type'), 'text/plain; charset=utf-8');
-    assert.equal(await response.text(), 'today keepout: wash face, brush teeth. mark it done on today.lost.plus to unlock.\n');
+    assert.equal(await response.text(), `today keepout: wash face, brush teeth. ${unlock} to unlock.\n`);
   });
 }
 
@@ -451,7 +451,7 @@ test('enabled edits wait for the next instance and leave the current plan and ke
   await enable();
   at('13:00');
   const before = (await call('GET', '/api/routine')).body.today;
-  const revised = ROUTINE.replace('Wake ! until wake, done', 'New wake')
+  const revised = ROUTINE.replace('Wake ! until done', 'New wake')
     .replace('14:00-02:30 Free', '14:00-02:30 New plan');
   const saved = await call('PUT', '/api/routine', { text: revised });
   assert.equal(saved.status, 200);
@@ -979,10 +979,11 @@ test('default point keepouts are sequential even when enabling exactly at their 
     '12:00 wake up');
   expectError(await status('done', wash.key), 409, 'locked');
   at('12:40');
-  const done = await status('done', wake.key);
+  expectError(await status('done', wake.key), 409, 'not_needed');
+  const done = await proofCall(call, 'wake');
   assert.equal(done.status, 200);
-  assert.equal(done.body.today.keepout.key, wash.key);
-  assert.deepEqual(done.body.today.keepout.needs, ['done']);
+  assert.equal(done.body.keepout.key, wash.key);
+  assert.deepEqual(done.body.keepout.needs, ['done']);
   assert.equal(done.body.today.items[1].phase, 'locked');
   assert.equal((await status('done', wash.key)).status, 200);
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
@@ -1117,7 +1118,7 @@ test('two-proof lock needs both, exposes have, and allows automatic partial retr
   assert.deepEqual(away.body.keepout.have, ['away']);
   assert.deepEqual((await call('GET', '/api/keepout')).body.keepout.have, ['away']);
   const text = await keepoutResponse(DB);
-  assert.equal(await text.text(), 'today keepout: Outing. mark it done on today.lost.plus to unlock.\n');
+  assert.equal(await text.text(), 'today keepout: Outing. send its proof to Hermes to unlock.\n');
   at('13:10');
   assert.deepEqual((await proofCall(call, 'away', { note: 'retry' })).body.item.proofs, away.body.item.proofs);
   const photo = await proofCall(call, 'photo', { day: '2026-10-05', key: '12:00..13:00', note: 'dinner' });
@@ -1147,21 +1148,27 @@ test('proof validation rejects bad bodies, wrong days, missing proofs, future it
   assert.equal((await proofCall(call, 'photo')).status, 200);
 });
 
-test('proofs respect minimum timing once locked and Done still overrides all proofs', async (t) => {
+test('proofs respect minimum timing once locked and Done cannot replace them', async (t) => {
   const { enable, call, status, at } = setup(t, '12:30');
   await enable('12:30..14:00 Outing ! until away 30m, photo; min 20m');
   await status('start', '12:30..14:00');
   expectError(await proofCall(call, 'away'), 409, 'too_soon');
   at('12:50');
   assert.equal((await proofCall(call, 'away')).body.item.phase, 'locked');
-  assert.equal((await status('done', '12:30..14:00')).body.today.items[0].phase, 'done');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.canDone, false);
+  expectError(await status('done', '12:30..14:00'), 409, 'not_needed');
+  assert.equal((await proofCall(call, 'photo')).body.item.phase, 'done');
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
 });
 
 test('wake alongside done still needs the manual button', async (t) => {
-  const { enable, call, status } = setup(t, '12:00');
+  const { enable, call, status, DB } = setup(t, '12:00');
   await enable('12:00 Wake ! until wake, done');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.canDone, false);
+  expectError(await status('done', '12:00'), 409, 'needs_proof');
   const wake = await proofCall(call, 'wake');
+  assert.equal(wake.body.keepout.canDone, true);
+  assert.equal(await (await keepoutResponse(DB)).text(), 'today keepout: Wake. mark it done on today.lost.plus to unlock.\n');
   assert.equal(wake.body.item.phase, 'locked');
   assert.deepEqual(wake.body.keepout.have, ['wake']);
   assert.deepEqual(wake.body.keepout.needs, ['wake', 'done']);

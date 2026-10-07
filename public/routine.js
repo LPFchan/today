@@ -202,10 +202,12 @@ export function parseRoutine(text, place = DEFAULT_PLACE, { validate = true } = 
       if (!clause || (!clause[1] && !clause[2])) throw new RoutineError('badUntil', line);
       if (clause[1]) clause[1].split(',').forEach((rawCondition) => {
         const condition = rawCondition.trim();
-        if (['done', 'wake', 'photo'].includes(condition)) until.push(condition);
-        else if (condition.startsWith('away ')) {
+        // A repeated condition is the same condition.
+        if (['done', 'wake', 'photo'].includes(condition)) {
+          if (!until.includes(condition)) until.push(condition);
+        } else if (condition.startsWith('away ')) {
           awayMinutes = duration(condition.slice(5), line, 'badUntil');
-          until.push('away');
+          if (!until.includes('away')) until.push('away');
         } else throw new RoutineError('badUntil', line);
       });
       if (clause[2]) minMinutes = duration(clause[2], line, 'badUntil');
@@ -343,7 +345,7 @@ export function progress(day, item, status, now) {
   return { since, doneAfter, done, startedAt, proofs, bypassed };
 }
 
-/** Requirements still outstanding; Done remains an explicit button action. */
+/** Requirements still outstanding; Done is an explicit button action. */
 export function remainingNeeds(lock) {
   return lock.needs.filter((need) => need === 'done' || !(lock.have ?? []).includes(need));
 }
@@ -362,8 +364,8 @@ export function keepoutState(day, statuses, now) {
       key: item.key, name: item.name, kind: item.kind, since: p.since,
       until: proof ? null : item.end, needs: [...item.until], have: Object.keys(p.proofs),
       canStart: item.kind === 'window' && p.startedAt === null && now < item.end,
-      // Temporary: Done satisfies every condition until phase 6.
-      canDone: proof && now >= p.doneAfter,
+      canDone: item.until.includes('done') && now >= p.doneAfter
+        && item.until.every((need) => need === 'done' || Object.hasOwn(p.proofs, need)),
       doneAfter: p.doneAfter,
     };
   }

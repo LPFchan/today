@@ -17,7 +17,7 @@
 import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
-  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
+  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState, remainingNeeds,
   parseRoutine, placeRoutine, progress, reportInstance, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
@@ -617,6 +617,13 @@ async function routineStatus(request, env, me, action) {
     if (!item.keepout || !item.until.length || (phase !== 'locked' && !early)) {
       return json(409, { error: 'not_due' });
     }
+    // Proof items unlock only through their proofs or a Hermes affordance;
+    // Done finishes an `until done` item once its other proofs are in.
+    if (!item.until.includes('done')) return json(409, { error: 'not_needed' });
+    const proofs = progress(routine.day, item, status, now).proofs;
+    if (!item.until.every((need) => need === 'done' || Object.hasOwn(proofs, need))) {
+      return json(409, { error: 'needs_proof' });
+    }
     if (!early && now < lock.doneAfter) return json(409, { error: 'too_soon' });
     const written = await env.DB.prepare(
       'INSERT INTO routine_status (sub, day, key, done_at) SELECT ?1, ?2, ?3, ?4 ' +
@@ -646,7 +653,7 @@ function proofItem(routine, proof, now) {
     && itemPhase(routine.day, item, routine.statuses[item.key], now) === 'open') ?? null;
 }
 
-/** Record a caller-verified proof; Done remains the temporary override. */
+/** Record a caller-verified proof. */
 async function routineProof(request, env, me) {
   const body = await request.json().catch(() => null);
   const explicit = body && (Object.hasOwn(body, 'day') || Object.hasOwn(body, 'key'));
@@ -767,8 +774,9 @@ function keepoutText(routine) {
   const keepout = routine.today?.keepout;
   if (!keepout) return '';
   const name = keepout.name.replace(/\s+/g, ' ').trim();
-  // Done remains the temporary override until phase 6.
-  if (keepout.needs.length) return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
+  const needs = remainingNeeds(keepout);
+  if (needs.join() === 'done') return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
+  if (needs.length) return `today keepout: ${name}. send its proof to Hermes to unlock.\n`;
   if (!keepout.until) return `today keepout: ${name}.\n`;
   const time = new Intl.DateTimeFormat('en-CA', {
     timeZone: routine.row?.tz ?? DEFAULT_PLACE.tz,

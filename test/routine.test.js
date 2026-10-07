@@ -328,11 +328,13 @@ test('windows open unlocked, start early or force a lock at the deadline', () =>
   assert.equal(deadline.since, at(day, 14));
   assert.equal(deadline.doneAfter, at(day, 14, 20));
   assert.deepEqual(deadline.needs, ['photo']);
+  assert.equal(keepoutState(day, {}, at(day, 14, 20)).canDone, false);
   assert.equal(keepoutState(day, { [item.key]: { startedAt: at(day, 15) } }, at(day, 16)).since, at(day, 14));
   assert.equal(keepoutState(day, {}, day.ends), null);
   assert.equal(itemPhase(day, item, {}, day.ends), 'missed');
 });
 
+// Done is no longer accepted for proof items, but a recorded Done still counts.
 test('a window finished while open is done and never locks', () => {
   const day = makeDay('12:30..14:00 meal ! until photo');
   const item = day.items[0];
@@ -346,7 +348,7 @@ test('a window finished while open is done and never locks', () => {
 });
 
 test('minimum lock time rejects premature completion and honors its exact boundary', () => {
-  const day = makeDay('12:30..14:00 meal ! until photo; min 20m');
+  const day = makeDay('12:30..14:00 meal ! until done; min 20m');
   const item = day.items[0];
   const startedAt = at(day, 13);
   const invalid = { startedAt, doneAt: at(day, 13, 19) };
@@ -427,4 +429,10 @@ test('default routine places and its moment-containing plan round-trips every da
     assert.deepEqual(restored, day.items.map(({ start, end, name }) => ({ start, end, name })));
     assert.deepEqual(parseSchedule(serializeSchedule(parseSchedule(plan.text))), parseSchedule(plan.text));
   }
+});
+
+
+test('repeated until conditions count once', () => {
+  const [item] = parseRoutine('12:00-12:20 wash ! until done, done, wake, wake');
+  assert.deepEqual(item.until, ['done', 'wake']);
 });
