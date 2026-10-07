@@ -430,3 +430,9 @@ test('default routine places and its moment-containing plan round-trips every da
     assert.deepEqual(parseSchedule(serializeSchedule(parseSchedule(plan.text))), parseSchedule(plan.text));
   }
 });
+
+
+test('repeated until conditions count once', () => {
+  const [item] = parseRoutine('12:00-12:20 wash ! until done, done, wake, wake');
+  assert.deepEqual(item.until, ['done', 'wake']);
+});

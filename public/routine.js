@@ -202,10 +202,12 @@ export function parseRoutine(text, place = DEFAULT_PLACE, { validate = true } = 
       if (!clause || (!clause[1] && !clause[2])) throw new RoutineError('badUntil', line);
       if (clause[1]) clause[1].split(',').forEach((rawCondition) => {
         const condition = rawCondition.trim();
-        if (['done', 'wake', 'photo'].includes(condition)) until.push(condition);
-        else if (condition.startsWith('away ')) {
+        // A repeated condition is the same condition.
+        if (['done', 'wake', 'photo'].includes(condition)) {
+          if (!until.includes(condition)) until.push(condition);
+        } else if (condition.startsWith('away ')) {
           awayMinutes = duration(condition.slice(5), line, 'badUntil');
-          until.push('away');
+          if (!until.includes('away')) until.push('away');
         } else throw new RoutineError('badUntil', line);
       });
       if (clause[2]) minMinutes = duration(clause[2], line, 'badUntil');
