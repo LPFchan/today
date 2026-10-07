@@ -89,6 +89,22 @@ test('opt-out, ordered locks, exact item and future/stale day pinning', async (t
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_affordances').get().n, 3);
 });
 
+test('keepout?open names the open window Hermes can skip before it locks', async (t) => {
+  const { bypass, enable, call, at } = setup(t);
+  const open = async () => (await call('GET', '/api/keepout?open')).body.open;
+  assert.equal((await call('GET', '/api/keepout')).body.open, undefined);
+  assert.equal(await open(), null);
+  await enable();
+  assert.equal(await open(), null);
+  await bypass('12:00', 1);
+  await bypass('12:00#2', 2);
+  assert.equal(await open(), null);
+  at('12:30');
+  assert.deepEqual(await open(), { key: '12:30..14:00', name: 'Meal', end: instant('14:00') });
+  assert.equal((await bypass('12:30..14:00', 3)).status, 200);
+  assert.equal(await open(), null);
+});
+
 test('first-write receipts, duplicate concurrency and payload conflict survive rollover', async (t) => {
   const { enable, bypass, at, DB } = setup(t);
   await enable();

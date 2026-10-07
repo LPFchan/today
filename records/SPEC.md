@@ -89,6 +89,8 @@ flash-and-chime when an item ends.
   day's locks and keeps the routine on; the next day locks as usual. The gateway requires the shared Today bearer token. Atomic receipts
   bind subject, day and numeric routine instance; identical retries preserve the
   receipt. Re-enable creates a fresh instance and clears live progress.
+  `GET /api/keepout?open` adds `open` ({key, name, end}): the first proof window
+  that is open but not yet locked, which bypass accepts early; null during a lock.
 - `GET /api/routine/report?day=YYYY-MM-DD` exposes private observed routine history
   for seven elapsed days after each instance ends. Incomplete days return 409;
   absent observations are missing coverage, never fabricated misses. Reports retain
