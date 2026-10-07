@@ -17,7 +17,7 @@ Worker (D1 `today`), hub registry row `today.lost.plus` (alias and scope
 answer in production. The Pebble app signs in through the hub's device login;
 Marie's watch is paired and reading its plan.
 
-The Mac menu bar app is released as mac-v2.1.2 (`Today.dmg` on GitHub, signed
+The Mac menu bar app is released as mac-v2.1.3 (`Today.dmg` on GitHub, signed
 Sparkle feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
 feed, and its sign-in reaches the hub's login page over a loopback port; a
 full sign-in with an account hasn't happened yet. The gateway accepts the
@@ -38,6 +38,8 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - 2026-10-07:
   - Change: Done is retired for proof items (PR #21, Worker `b6177ec4`): wake, meal photo and outing items unlock only through their proofs or a Hermes skip, and a mixed `until wake, done` lock takes Done only after its wake proof. The wake alarm can be snoozed for 5, 30 or 60 minutes from the Mac lock screen or Hermes' `wake_snooze` (PR #22, migration 0008, Worker `37170515`; brief PR #19); the lock stays until the wake proof. The gateway's today POST routes are folded into one `/api/routine` route (auth PRs #7, #8). Operator-approved mac-v2.1.2 is published from `3b1e2da` (Sparkle build 63, run `37577603425`).
   - Why it matters: phase 6's last open item is confirming the morning brief's delivery. Installation of 2.1.2 on individual Macs is unverified; until a Mac updates, its lock screen still shows Done on proof locks and the server refuses it.
+  - Change: the Mac panel's upcoming list marks your own keepouts with a lock glyph and the time each locks; `/api/board` carries `lock` on the owner's items only (PR #23, Worker `f5f0a704`). Operator-approved mac-v2.1.3 is published from `d57c32b` (Sparkle build 65, run `37594132332`).
+  - Why it matters: the menu bar shows what the routine page shows about upcoming locks. Older Mac builds ignore the new field.
 
 - 2026-10-06:
   - Change: the operator turned auto-routine on with the default routine. Every way out of a lock is live: wake alarm (mac-v2.1.1, dumpling fallback), meal photos and skips through Hermes (`meal_judgment`, `routine_skip`), the Find My outing proof with the room-only Roborock clean, and calendar days off. Brief's morning brief adds routine history, vacuum status and Monday's weekly time outside. The routine page no longer shows loading or turned-on status lines (PRs #18, #19).
