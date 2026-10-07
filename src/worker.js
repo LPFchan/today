@@ -118,6 +118,13 @@ async function api(request, env, url) {
         result.item = item && !Object.hasOwn(progress(routine.day, item, routine.statuses[item.key], now).proofs, proof)
           ? { key: item.key, start: item.start, end: item.end, awayMinutes: item.awayMinutes } : null;
       }
+      // Hermes can skip an open window early, before it becomes a lock.
+      if (url.searchParams.has('open')) {
+        const item = routine.statuses && !result.keepout ? routine.day.items.find((entry) => entry.keepout
+          && entry.kind === 'window' && entry.until.length
+          && itemPhase(routine.day, entry, routine.statuses[entry.key], now) === 'open') : null;
+        result.open = item ? { key: item.key, name: item.name, end: item.end } : null;
+      }
       return json(200, result);
     }
     default:
