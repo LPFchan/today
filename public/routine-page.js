@@ -108,7 +108,7 @@ function actionButton(action, item, canAct, doneAfter = 0) {
 function keepoutActions(container, state) {
   if (state.canStart) container.append(actionButton('start', state, true));
   // Keep the Done control visible while its minimum duration is counting down.
-  if (state.needs.includes('done') && (state.canDone || state.doneAfter > Date.now())) {
+  if (remainingNeeds(state).join() === 'done' && (state.canDone || state.doneAfter > Date.now())) {
     container.append(actionButton('done', state, state.canDone, state.doneAfter));
   }
 }
@@ -175,7 +175,8 @@ function render() {
     const buttons = node('div', 'routine-actions');
     if (isKeepoutNow) {
       keepoutActions(buttons, keepout);
-    } else if (!keepout && item.keepout && item.until.includes('done') && item.phase === 'open' && item.kind === 'window') {
+    } else if (!keepout && item.keepout && item.until.includes('done') && item.phase === 'open' && item.kind === 'window'
+        && item.until.every((need) => need === 'done' || Object.hasOwn(item.proofs ?? {}, need))) {
       // Finishing an open window before its deadline means it never locks.
       buttons.append(actionButton('done', item, true));
     }

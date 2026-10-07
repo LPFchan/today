@@ -73,7 +73,7 @@ struct KeepoutView: View {
     }
 
     // The countdown reaching zero is enough; the server checks again on Done.
-    private var canDone: Bool { lock.needs.contains("done") && !busy && now >= lock.doneAfter }
+    private var canDone: Bool { lock.remainingNeeds == ["done"] && !busy && now >= lock.doneAfter }
 
     /// Time left on a lock that time lifts (sleep), or on a minimum lock.
     private var countdown: TimeInterval? {

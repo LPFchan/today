@@ -5,7 +5,7 @@ import { DEFAULT_ROUTINE, parseRoutine, routineDay, routineSchedule } from '../p
 import { testDatabase } from './d1.js';
 
 const ORIGIN = 'https://today.lost.plus';
-const ROUTINE = `12:00-12:20 Wake ! until wake, done
+const ROUTINE = `12:00-12:20 Wake ! until done
 12:30..14:00 Meal ! until done; min 20m
 14:00-02:30 Free
 02:30-12:00 Sleep !`;
@@ -451,7 +451,7 @@ test('enabled edits wait for the next instance and leave the current plan and ke
   await enable();
   at('13:00');
   const before = (await call('GET', '/api/routine')).body.today;
-  const revised = ROUTINE.replace('Wake ! until wake, done', 'New wake')
+  const revised = ROUTINE.replace('Wake ! until done', 'New wake')
     .replace('14:00-02:30 Free', '14:00-02:30 New plan');
   const saved = await call('PUT', '/api/routine', { text: revised });
   assert.equal(saved.status, 200);
@@ -1164,7 +1164,10 @@ test('proofs respect minimum timing once locked and Done cannot replace them', a
 test('wake alongside done still needs the manual button', async (t) => {
   const { enable, call, status } = setup(t, '12:00');
   await enable('12:00 Wake ! until wake, done');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout.canDone, false);
+  expectError(await status('done', '12:00'), 409, 'needs_proof');
   const wake = await proofCall(call, 'wake');
+  assert.equal(wake.body.keepout.canDone, true);
   assert.equal(wake.body.item.phase, 'locked');
   assert.deepEqual(wake.body.keepout.have, ['wake']);
   assert.deepEqual(wake.body.keepout.needs, ['wake', 'done']);

@@ -617,8 +617,13 @@ async function routineStatus(request, env, me, action) {
     if (!item.keepout || !item.until.length || (phase !== 'locked' && !early)) {
       return json(409, { error: 'not_due' });
     }
-    // Proof items unlock only through their proofs or a Hermes affordance.
+    // Proof items unlock only through their proofs or a Hermes affordance;
+    // Done finishes an `until done` item once its other proofs are in.
     if (!item.until.includes('done')) return json(409, { error: 'not_needed' });
+    const proofs = progress(routine.day, item, status, now).proofs;
+    if (!item.until.every((need) => need === 'done' || Object.hasOwn(proofs, need))) {
+      return json(409, { error: 'needs_proof' });
+    }
     if (!early && now < lock.doneAfter) return json(409, { error: 'too_soon' });
     const written = await env.DB.prepare(
       'INSERT INTO routine_status (sub, day, key, done_at) SELECT ?1, ?2, ?3, ?4 ' +

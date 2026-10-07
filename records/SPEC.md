@@ -67,8 +67,9 @@ flash-and-chime when an item ends.
   Done's timing and action-order rules; retries preserve the first timestamp
   and note (up to 200 characters). The response includes the updated item and
   keepout. All required proofs complete an item; an `until done` condition
-  still requires the button. `POST /api/routine/done` refuses items without
-  an `until done` condition (`not_needed`); a Done recorded before that rule
+  still requires the button, which works only once the item's other proofs
+  are in (`needs_proof`). `POST /api/routine/done` refuses items without an
+  `until done` condition (`not_needed`); a Done recorded before that rule
   still counts.
   `GET /api/routine` exposes item `proofs`; keepout JSON adds `have` alongside
   the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds an eligible
