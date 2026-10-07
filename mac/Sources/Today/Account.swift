@@ -161,6 +161,11 @@ enum Account {
         _ = try await authorized("api/routine/done", body: body)
     }
 
+    static func snooze(minutes: Int) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["minutes": minutes])
+        _ = try await authorized("api/routine/snooze", body: body)
+    }
+
     /// Hold the queue through refresh, save, request and the one retry.
     private static func authorized(_ path: String, body: Data? = nil) async throws -> Data {
         try await requests.run {

@@ -12,6 +12,7 @@ struct KeepoutView: View {
     let done: () -> Void
     /// The notch's height on screens that have one.
     var topInset: CGFloat = 0
+    var snooze: (Int) -> Void = { _ in }
 
     var body: some View {
         ZStack {
@@ -50,6 +51,9 @@ struct KeepoutView: View {
                         .keyboardShortcut(.defaultAction)
                         .padding(.top, 44)
                     }
+                    if lock.remainingNeeds.contains("wake") {
+                        snoozeControls.padding(.top, 44)
+                    }
                     if let problem {
                         Text(problem)
                             .font(.system(size: 13))
@@ -70,6 +74,31 @@ struct KeepoutView: View {
             .padding(.horizontal, 24)
         }
         .environment(\.colorScheme, .dark)
+    }
+
+    /// Quiets the alarm, not the lock: the wake proof still unlocks it.
+    private var snoozeControls: some View {
+        VStack(spacing: 14) {
+            if let until = lock.snoozedUntil, until > now {
+                Text(String(format: L10n.tr("Snoozed until %@"), Self.time.string(from: until)))
+                    .font(.system(size: 15))
+                    .foregroundStyle(Self.muted)
+            }
+            HStack(spacing: 12) {
+                ForEach([5, 30, 60], id: \.self) { minutes in
+                    Button { snooze(minutes) } label: {
+                        Text(String(format: L10n.tr("Snooze %d min"), minutes))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(busy ? Self.muted : Self.text)
+                            .padding(.horizontal, 20)
+                            .padding(.vertical, 12)
+                            .background(Self.disabled, in: .rect(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(busy)
+                }
+            }
+        }
     }
 
     // The countdown reaching zero is enough; the server checks again on Done.

@@ -91,6 +91,8 @@ async function api(request, env, url) {
       return routineStatus(request, env, me, 'done');
     case 'POST /api/routine/proof':
       return routineProof(request, env, me);
+    case 'POST /api/routine/snooze':
+      return routineSnooze(request, env, me);
     // Gateway MUST route this exact POST as mcp (machine credentials only,
     // today scope/visibility). The shared token does not identify Hermes.
     case 'POST /api/routine/affordance':
@@ -283,10 +285,11 @@ async function currentRoutine(env, me, now = Date.now()) {
     return result;
   }
   const { results } = await env.DB.prepare(
-    'SELECT key, started_at, done_at, proofs FROM routine_status WHERE sub = ?1 AND day = ?2',
+    'SELECT key, started_at, done_at, proofs, snoozed_until FROM routine_status WHERE sub = ?1 AND day = ?2',
   ).bind(me.sub, day.day).all();
   const statuses = Object.fromEntries(results.map((status) => [status.key, {
     startedAt: status.started_at, doneAt: status.done_at, proofs: JSON.parse(status.proofs),
+    snoozedUntil: status.snoozed_until,
   }]));
   const { results: bypasses } = await env.DB.prepare(
     "SELECT day, key, at, reason FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND instance = ?3 AND action = 'bypass'",
@@ -641,6 +644,25 @@ function routineWriteGuard(instance, text) {
     'AND NOT EXISTS (SELECT 1 FROM routine_away WHERE sub = ?1 AND day = ?2) ' +
     "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND key = ?3 AND instance = routines.instance AND action = 'bypass') " +
     "AND NOT EXISTS (SELECT 1 FROM routine_affordances WHERE sub = ?1 AND day = ?2 AND instance = routines.instance AND action = 'skip_day')";
+}
+
+/** Silence a ringing wake alarm; the lock stays until the wake proof. */
+async function routineSnooze(request, env, me) {
+  const body = await request.json().catch(() => null);
+  if (!body || ![5, 30, 60].includes(body.minutes)) return json(400, { error: 'bad_request' });
+  const now = Date.now();
+  const routine = await currentRoutine(env, me, now);
+  const lock = routine.today?.keepout;
+  if (!lock || !lock.needs.includes('wake') || lock.have.includes('wake')) return json(409, { error: 'not_needed' });
+  const written = await env.DB.prepare(
+    'INSERT INTO routine_status (sub, day, key, snoozed_until) SELECT ?1, ?2, ?3, ?4 ' +
+      routineWriteGuard(5, 6) + ' ' +
+      'ON CONFLICT (sub, day, key) DO UPDATE SET snoozed_until = ?4',
+  ).bind(me.sub, routine.day.day, lock.key, now + body.minutes * 60_000,
+    routine.row.instance, routine.row.text).run();
+  if (!written.meta.changes) return json(409, { error: 'state_changed' });
+  const updated = await currentRoutine(env, me, now);
+  return json(200, { now, day: updated.today?.day ?? null, keepout: updated.today?.keepout ?? null });
 }
 
 /** Select the current proof-bearing item without skipping an earlier lock. */

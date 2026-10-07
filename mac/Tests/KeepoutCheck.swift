@@ -18,6 +18,14 @@ import Foundation
         precondition(accepted.keepout?.remainingNeeds == ["photo"])
         let cached = try JSONDecoder().decode(KeepoutReply.self, from: JSONEncoder().encode(accepted))
         precondition(cached == accepted)
+        precondition(accepted.keepout?.snoozedUntil == nil)
+        lock["snoozedUntil"] = 61000
+        present["keepout"] = lock
+        let snoozed = try JSONDecoder().decode(KeepoutReply.self, from: JSONSerialization.data(withJSONObject: present))
+        precondition(snoozed.keepout?.snoozedUntil == Date(timeIntervalSince1970: 61))
+        let snoozedCache = try JSONDecoder().decode(KeepoutReply.self, from: JSONEncoder().encode(snoozed))
+        precondition(snoozedCache == snoozed)
+        lock["snoozedUntil"] = nil
         lock["needs"] = ["wake", "done"]
         lock["have"] = ["wake", "done"]
         present["keepout"] = lock

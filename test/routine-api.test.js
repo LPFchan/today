@@ -1249,3 +1249,31 @@ test('automatic selection cannot write an open window during an unrelated lock',
   expectError(await proofCall(call, 'photo'), 409, 'locked');
   assert.equal(DB.raw.prepare('SELECT count(*) AS n FROM routine_status').get().n, 0);
 });
+
+test('a ringing wake lock can be snoozed; the lock stays and the wake proof ends it', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake\n12:30..14:00 Meal ! until photo');
+  const snooze = (minutes) => call('POST', '/api/routine/snooze', { minutes });
+  for (const minutes of [undefined, 0, 10, '5', 5.5]) expectError(await snooze(minutes), 400, 'bad_request');
+  const first = await snooze(5);
+  assert.equal(first.status, 200);
+  assert.equal(first.body.day, '2026-10-05');
+  assert.equal(first.body.keepout.key, '12:00');
+  assert.equal(first.body.keepout.snoozedUntil, instant('12:05'));
+  at('12:03');
+  // Snoozing again restarts from now.
+  assert.equal((await snooze(30)).body.keepout.snoozedUntil, instant('12:33'));
+  at('12:33');
+  const lock = (await call('GET', '/api/keepout')).body.keepout;
+  assert.equal(lock.key, '12:00');
+  assert.equal(lock.snoozedUntil, null);
+  assert.equal((await proofCall(call, 'wake')).status, 200);
+  expectError(await snooze(5), 409, 'not_needed');
+});
+
+test('only a wake lock can be snoozed', async (t) => {
+  const { enable, call } = setup(t, '12:00');
+  expectError(await call('POST', '/api/routine/snooze', { minutes: 5 }), 409, 'not_needed');
+  await enable('12:00 Wash ! until done');
+  expectError(await call('POST', '/api/routine/snooze', { minutes: 5 }), 409, 'not_needed');
+});
