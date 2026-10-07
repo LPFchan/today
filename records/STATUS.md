@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-07:
+  - Change: the Mac panel no longer slides sideways when you switch people; the menu bar keeps the timer it had when the panel opened and switches after it closes (PR #26, `a12acf8`).
+  - Why it matters: the menu bar item changes width with the timer and the panel is anchored to it. Built by mac CI only; not yet released or tried on a real Mac.
+
+- 2026-10-07:
   - Change: Hermes can skip an open window early, before it locks: `GET /api/keepout?open` names it (PR #25, Worker `20c132d6`) and brief's `routine_skip` item scope uses it when nothing is locked (brief PR #21, Hermes gateway restarted).
   - Why it matters: the operator can skip an outing ahead of time instead of waiting for it to lock. Hermes actions still have no undo; the operator deferred that.
 
