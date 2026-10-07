@@ -179,7 +179,14 @@ async function loadProfile() {
   state.profileAt = Date.now();
   const seq = state.profileSeq;
   const read = ++state.profileReads;
-  const profile = await request('GET', '/api/me');
+  let profile;
+  try {
+    profile = await request('GET', '/api/me');
+  } catch (error) {
+    // The latest read failing ends the wait: show the empty page, not nothing.
+    if (read === state.profileReads) el.main.removeAttribute('aria-busy');
+    throw error;
+  }
   // Only the latest read applies, and not if a save landed meanwhile.
   if (read === state.profileReads && state.profileSeq === seq) applyProfile(profile);
 }
@@ -892,7 +899,4 @@ setInterval(() => {
 translatePage();
 renderAlert();
 setView(state.view);
-loadProfile().catch((error) => {
-  showToast(error.message);
-  el.main.removeAttribute('aria-busy');
-});
+loadProfile().catch((error) => showToast(error.message));
