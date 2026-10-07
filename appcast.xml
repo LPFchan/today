@@ -5,6 +5,15 @@
     <link>https://raw.githubusercontent.com/LPFchan/today/mac-appcast/appcast.xml</link>
     <language>en</language>
     <item>
+      <title>Version 2.1.3</title>
+      <pubDate>Wed, 07 Oct 2026 08:32:07 GMT</pubDate>
+      <sparkle:version>65</sparkle:version>
+      <sparkle:shortVersionString>2.1.3</sparkle:shortVersionString>
+      <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+      <sparkle:fullReleaseNotesLink>https://github.com/LPFchan/today/releases/tag/mac-v2.1.3</sparkle:fullReleaseNotesLink>
+      <enclosure url="https://github.com/LPFchan/today/releases/download/mac-v2.1.3/Today.dmg" type="application/octet-stream" sparkle:edSignature="y+Up8CjZw3EVRX3Wx/zGz3joYMqKNVN5Hp+mEL7564E8+fGMRgm8XrmnLvcvevxCCy76d2EkuWBWJF1eD84wAw==" length="2713486"/>
+    </item>
+    <item>
       <title>Version 2.1.2</title>
       <pubDate>Wed, 07 Oct 2026 05:43:35 GMT</pubDate>
       <sparkle:version>63</sparkle:version>
