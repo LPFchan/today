@@ -343,7 +343,7 @@ export function progress(day, item, status, now) {
   return { since, doneAfter, done, startedAt, proofs, bypassed };
 }
 
-/** Requirements still outstanding; Done remains an explicit button action. */
+/** Requirements still outstanding; Done is an explicit button action. */
 export function remainingNeeds(lock) {
   return lock.needs.filter((need) => need === 'done' || !(lock.have ?? []).includes(need));
 }
@@ -362,8 +362,7 @@ export function keepoutState(day, statuses, now) {
       key: item.key, name: item.name, kind: item.kind, since: p.since,
       until: proof ? null : item.end, needs: [...item.until], have: Object.keys(p.proofs),
       canStart: item.kind === 'window' && p.startedAt === null && now < item.end,
-      // Temporary: Done satisfies every condition until phase 6.
-      canDone: proof && now >= p.doneAfter,
+      canDone: item.until.includes('done') && now >= p.doneAfter,
       doneAfter: p.doneAfter,
     };
   }

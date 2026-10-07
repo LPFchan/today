@@ -58,15 +58,18 @@ flash-and-chime when an item ends.
 - `GET /api/keepout` defaults to JSON (`now`, `day`, `keepout`). With
   `Accept: text/plain`, it returns 200 with `text/plain; charset=utf-8`:
   an empty body when free, or one newline-terminated `today keepout:` line
-  naming the item and how to unlock it (Done, for now), or its unlock time as
-  HH:MM in the routine's timezone. Errors retain their JSON shape and status.
+  naming the item and how to unlock it (Done, or its proof through Hermes),
+  or its unlock time as HH:MM in the routine's timezone. Errors retain
+  their JSON shape and status.
 - `POST /api/routine/proof {proof, note?}` records a private `wake`, `photo`, or
   `away` proof for the current keepout that needs it, or an open keepout window.
   Optional `day` and `key` together select an item explicitly. Proofs follow
   Done's timing and action-order rules; retries preserve the first timestamp
   and note (up to 200 characters). The response includes the updated item and
   keepout. All required proofs complete an item; an `until done` condition
-  still requires the button. Done overrides all proofs until phase 6.
+  still requires the button. `POST /api/routine/done` refuses items without
+  an `until done` condition (`not_needed`); a Done recorded before that rule
+  still counts.
   `GET /api/routine` exposes item `proofs`; keepout JSON adds `have` alongside
   the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds an eligible
   `item` (key, window start/end, required away minutes), or null when blocked,

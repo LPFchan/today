@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// What covers the main screen while a keepout item holds the lock: the item,
-/// what lifts it, a countdown when time is what lifts it, and Done.
+/// what lifts it, a countdown when time is what lifts it, and Done for
+/// items that take it.
 struct KeepoutView: View {
     let lock: Keepout
     let next: Item?
@@ -35,7 +36,7 @@ struct KeepoutView: View {
                     if let left = countdown {
                         clock(left).padding(.top, 40)
                     }
-                    if !lock.needs.isEmpty {
+                    if lock.needs.contains("done") {
                         Button(action: done) {
                             Text(L10n.tr("Done"))
                                 .font(.system(size: 19, weight: .semibold))
@@ -72,7 +73,7 @@ struct KeepoutView: View {
     }
 
     // The countdown reaching zero is enough; the server checks again on Done.
-    private var canDone: Bool { !lock.needs.isEmpty && !busy && now >= lock.doneAfter }
+    private var canDone: Bool { lock.needs.contains("done") && !busy && now >= lock.doneAfter }
 
     /// Time left on a lock that time lifts (sleep), or on a minimum lock.
     private var countdown: TimeInterval? {

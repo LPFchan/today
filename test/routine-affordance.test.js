@@ -387,7 +387,7 @@ for (const completion of ['partial', 'proof', 'done']) {
   test(`same-key re-enable clears ${completion} status while preserving earlier evidence`, async (t) => {
     const { enable, call, off, at, report, DB } = setup(t, '13:00');
     const key = '12:30..14:00';
-    const text = '12:30..14:00 Outing ! until away 30m, photo';
+    const text = `12:30..14:00 Outing ! until ${completion === 'done' ? 'done' : 'away 30m, photo'}`;
     await enable(text);
     await call('POST', '/api/routine/start', { day: '2026-10-05', key });
     at('13:01');
