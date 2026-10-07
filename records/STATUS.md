@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-07:
+  - Change: the web page no longer flashes its placeholder views (the 00:00 skeleton, then the empty plan prompt) before the plan loads; `main` stays invisible until the first profile read settles (PR #24, Worker `40d8b6d7`).
+  - Why it matters: every load showed two wrong screens first. Verified with a throttled phone-size headless recording; the signed-in production page was not directly checked.
+
+- 2026-10-07:
   - Change: Done is retired for proof items (PR #21, Worker `b6177ec4`): wake, meal photo and outing items unlock only through their proofs or a Hermes skip, and a mixed `until wake, done` lock takes Done only after its wake proof. The wake alarm can be snoozed for 5, 30 or 60 minutes from the Mac lock screen or Hermes' `wake_snooze` (PR #22, migration 0008, Worker `37170515`; brief PR #19); the lock stays until the wake proof. The gateway's today POST routes are folded into one `/api/routine` route (auth PRs #7, #8). Operator-approved mac-v2.1.2 is published from `3b1e2da` (Sparkle build 63, run `37577603425`).
   - Why it matters: phase 6's last open item is confirming the morning brief's delivery. Installation of 2.1.2 on individual Macs is unverified; until a Mac updates, its lock screen still shows Done on proof locks and the server refuses it.
   - Change: the Mac panel's upcoming list marks your own keepouts with a lock glyph and the time each locks; `/api/board` carries `lock` on the owner's items only (PR #23, Worker `f5f0a704`). Operator-approved mac-v2.1.3 is published from `d57c32b` (Sparkle build 65, run `37594132332`).
