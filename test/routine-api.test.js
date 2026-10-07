@@ -83,7 +83,7 @@ test('plain-text time locks use HH:MM in the routine timezone', async (t) => {
 });
 
 for (const needs of ['done', 'wake', 'photo', 'away 30m', 'wake, done, photo, away 30m']) {
-  const unlock = needs.includes('done') ? 'mark it done on today.lost.plus' : 'send its proof to Hermes';
+  const unlock = needs === 'done' ? 'mark it done on today.lost.plus' : 'send its proof to Hermes';
   test(`plain-text action lock (${needs}) says to ${unlock}`, async (t) => {
     const { DB, enable } = setup(t, '12:00');
     await enable(`12:00-12:20 wash face, brush teeth ! until ${needs}`);
@@ -1162,12 +1162,13 @@ test('proofs respect minimum timing once locked and Done cannot replace them', a
 });
 
 test('wake alongside done still needs the manual button', async (t) => {
-  const { enable, call, status } = setup(t, '12:00');
+  const { enable, call, status, DB } = setup(t, '12:00');
   await enable('12:00 Wake ! until wake, done');
   assert.equal((await call('GET', '/api/keepout')).body.keepout.canDone, false);
   expectError(await status('done', '12:00'), 409, 'needs_proof');
   const wake = await proofCall(call, 'wake');
   assert.equal(wake.body.keepout.canDone, true);
+  assert.equal(await (await keepoutResponse(DB)).text(), 'today keepout: Wake. mark it done on today.lost.plus to unlock.\n');
   assert.equal(wake.body.item.phase, 'locked');
   assert.deepEqual(wake.body.keepout.have, ['wake']);
   assert.deepEqual(wake.body.keepout.needs, ['wake', 'done']);

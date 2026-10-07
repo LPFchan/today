@@ -17,7 +17,7 @@
 import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
-  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState,
+  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState, remainingNeeds,
   parseRoutine, placeRoutine, progress, reportInstance, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
@@ -774,8 +774,9 @@ function keepoutText(routine) {
   const keepout = routine.today?.keepout;
   if (!keepout) return '';
   const name = keepout.name.replace(/\s+/g, ' ').trim();
-  if (keepout.needs.includes('done')) return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
-  if (keepout.needs.length) return `today keepout: ${name}. send its proof to Hermes to unlock.\n`;
+  const needs = remainingNeeds(keepout);
+  if (needs.join() === 'done') return `today keepout: ${name}. mark it done on today.lost.plus to unlock.\n`;
+  if (needs.length) return `today keepout: ${name}. send its proof to Hermes to unlock.\n`;
   if (!keepout.until) return `today keepout: ${name}.\n`;
   const time = new Intl.DateTimeFormat('en-CA', {
     timeZone: routine.row?.tz ?? DEFAULT_PLACE.tz,
