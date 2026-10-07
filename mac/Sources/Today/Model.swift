@@ -28,7 +28,16 @@ final class Model {
     }
     /// Whose timer sits in the menu bar: `Person.meID` or a friend's name.
     var selection = UserDefaults.standard.string(forKey: "person") ?? Person.meID {
-        didSet { UserDefaults.standard.set(selection, forKey: "person") }
+        didSet {
+            UserDefaults.standard.set(selection, forKey: "person")
+            if !panelOpen { menuBarSelection = selection }
+        }
+    }
+    /// `selection`, held still while the panel is open: the menu bar item
+    /// changes width with the timer, and the panel slides along with it.
+    private(set) var menuBarSelection = UserDefaults.standard.string(forKey: "person") ?? Person.meID
+    var panelOpen = false {
+        didSet { if !panelOpen { menuBarSelection = selection } }
     }
     /// Post a notification when anyone's next item starts.
     var notify = UserDefaults.standard.object(forKey: "notify") as? Bool ?? true {
@@ -130,8 +139,13 @@ final class Model {
     }
 
     /// The selected person, or you when they've stopped sharing.
-    var person: Person? {
-        people.first { $0.id == selection } ?? people.first { $0.me }
+    var person: Person? { person(selection) }
+
+    /// Whose timer the menu bar shows right now.
+    var menuBarPerson: Person? { person(menuBarSelection) }
+
+    private func person(_ id: String) -> Person? {
+        people.first { $0.id == id } ?? people.first { $0.me }
     }
 
     private var preview: Bool {

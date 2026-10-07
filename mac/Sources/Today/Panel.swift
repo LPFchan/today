@@ -12,7 +12,7 @@ struct MenuBarLabel: View {
 
     var body: some View {
         let image: NSImage = {
-            guard model.session == .signedIn, let person = model.person else {
+            guard model.session == .signedIn, let person = model.menuBarPerson else {
                 return StatusIcon.image(remaining: nil, countdown: nil, dimmed: model.session != .signedIn)
             }
             let status = Status(person.items, at: model.now)
@@ -51,7 +51,43 @@ struct Panel: View {
         }
         .padding(.vertical, 10)
         .frame(width: 330)
+        .background(PanelWatcher(model: model))
         .onAppear { model.syncLoginItem(); model.refresh() }
+    }
+}
+
+/// Tracks whether the panel is on screen. MenuBarExtra has no open/close
+/// hook, but its window is key exactly while it's showing.
+private struct PanelWatcher: NSViewRepresentable {
+    let model: Model
+
+    func makeNSView(context: Context) -> NSView { WatcherView(model: model) }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+
+    final class WatcherView: NSView {
+        let model: Model
+        private var observers: [NSObjectProtocol] = []
+
+        init(model: Model) {
+            self.model = model
+            super.init(frame: .zero)
+        }
+
+        required init?(coder: NSCoder) { fatalError() }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            observers.forEach(NotificationCenter.default.removeObserver)
+            observers = []
+            guard let window else { return }
+            let model = model
+            for (name, open) in [(NSWindow.didBecomeKeyNotification, true), (NSWindow.didResignKeyNotification, false)] {
+                observers.append(NotificationCenter.default.addObserver(forName: name, object: window, queue: .main) { _ in
+                    MainActor.assumeIsolated { model.panelOpen = open }
+                })
+            }
+            model.panelOpen = window.isKeyWindow
+        }
     }
 }
 
