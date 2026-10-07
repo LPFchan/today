@@ -46,9 +46,8 @@ the board, the watch or the Mac app.
 ### Near Term
 
 - Phase 6 — finish the escape hatches:
-  - Why now: auto-routine is live and every proof and Hermes control works; Done
-    is still the temporary fallback for every item.
-  - Remaining: retire Done for photo, away and wake items once the operator trusts
-    the proofs in daily use; confirm the morning brief's delivery so reported
-    misses and skips are acknowledged once.
+  - Why now: auto-routine is live, Done is retired for proof items, and the wake
+    alarm can be snoozed.
+  - Remaining: confirm the morning brief's delivery so reported misses and skips
+    are acknowledged once.
   - Related ids: DEC-20261005-001, DEC-20261005-002
