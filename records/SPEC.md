@@ -77,6 +77,11 @@ flash-and-chime when an item ends.
   completed, opted out, or on a day off. Collectors count away time from that
   window's start and post with its day/key. Proofs retain today's and yesterday's
   progress only.
+- `POST /api/routine/snooze {minutes: 5|30|60}` quiets a wake lock still waiting
+  for its proof (`not_needed` otherwise); the lock stays. It answers like
+  `GET /api/keepout`, whose keepout carries `snoozedUntil` while the snooze runs.
+  Snoozing again restarts from now. The Mac alarm and dumpling's fallback stay
+  silent until then; the Mac lock screen and Hermes (`wake_snooze`) offer it.
 - `POST /api/routine/affordance {action, day, key?, reason, requestId}` accepts
   explicit current-day `bypass`, `skip_day` or `off` controls. Bypass uses the exact
   item key; skip_day and off omit it. skip_day ends the rest of the current routine

@@ -91,7 +91,8 @@ private struct CoverContent: View {
 
     var body: some View {
         if let lock = model.keepout {
-            KeepoutView(lock: lock, next: model.next, now: model.now, busy: model.finishing, problem: model.finishProblem, done: model.finish, topInset: topInset)
+            KeepoutView(lock: lock, next: model.next, now: model.now, busy: model.finishing, problem: model.finishProblem, done: model.finish, topInset: topInset,
+                        snooze: { model.snooze(minutes: $0) })
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(white: 0.06))
                 .environment(\.colorScheme, .dark)

@@ -23,7 +23,9 @@ final class Model {
     var updated: Date?
     var problem: String?
     /// Ticks every second; views read it so the timers move.
-    var now = Date()
+    var now = Date() {
+        didSet { syncWakeAlarm() }
+    }
     /// Whose timer sits in the menu bar: `Person.meID` or a friend's name.
     var selection = UserDefaults.standard.string(forKey: "person") ?? Person.meID {
         didSet { UserDefaults.standard.set(selection, forKey: "person") }
@@ -145,7 +147,7 @@ final class Model {
     private func syncWakeAlarm() {
         guard live else { return }
         wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true
-            && keepout?.have.contains("wake") != true)
+            && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false))
     }
 
     /// Restore system audio before a normal termination, logout or restart.
@@ -288,6 +290,32 @@ final class Model {
                 case "not_due", "locked": failure = L10n.tr("Refreshing…")
                 default: failure = error
                 }
+            } catch {
+                failure = error.localizedDescription
+            }
+            guard current == generation else { return }
+            await fetchKeepout(generation: current)
+            if current == generation, keepout != nil, let failure { finishProblem = failure }
+        }
+    }
+
+    /// Quiet the wake alarm for a while; the lock stays until the wake proof.
+    func snooze(minutes: Int) {
+        guard keepout != nil, !finishing, !preview else { return }
+        finishing = true
+        finishProblem = nil
+        let current = generation
+        Task {
+            defer { if current == generation { finishing = false } }
+            await keepoutTask?.value
+            guard current == generation else { return }
+            var failure: String?
+            do {
+                try await Account.snooze(minutes: minutes)
+            } catch Account.Failure.signedOut {
+                guard current == generation else { return }
+                authenticationExpired()
+                return
             } catch {
                 failure = error.localizedDescription
             }

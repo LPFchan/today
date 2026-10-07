@@ -360,6 +360,7 @@ export function keepoutState(day, statuses, now) {
     const proof = item.until.length > 0;
     const locked = proof ? now >= p.since && !p.done && !p.bypassed : now < item.end;
     if (!locked || (state && state.since <= p.since)) continue;
+    const snoozedUntil = statuses?.[item.key]?.snoozedUntil;
     state = {
       key: item.key, name: item.name, kind: item.kind, since: p.since,
       until: proof ? null : item.end, needs: [...item.until], have: Object.keys(p.proofs),
@@ -367,6 +368,9 @@ export function keepoutState(day, statuses, now) {
       canDone: item.until.includes('done') && now >= p.doneAfter
         && item.until.every((need) => need === 'done' || Object.hasOwn(p.proofs, need)),
       doneAfter: p.doneAfter,
+      // Only a wake alarm still waiting for its proof can be snoozed.
+      snoozedUntil: item.until.includes('wake') && !Object.hasOwn(p.proofs, 'wake')
+        && snoozedUntil > now ? snoozedUntil : null,
     };
   }
   return state;

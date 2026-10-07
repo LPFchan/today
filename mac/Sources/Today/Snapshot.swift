@@ -50,11 +50,13 @@ enum Snapshot {
         save(panel, dark: true, to: dir.appending(path: "panel-signed-out.png"))
 
         // The keepout overlay, at a laptop screen's size.
-        func lock(_ name: String, needs: [String], until: Double?, doneAfter: Double, canDone: Bool) -> Keepout {
+        func lock(_ name: String, needs: [String], until: Double?, doneAfter: Double, canDone: Bool,
+                  snoozedUntil: Double? = nil) -> Keepout {
             let ms = { (minutes: Double) in at(minutes).timeIntervalSince1970 * 1000 }
             let fields: [String: Any?] = [
                 "key": name, "name": name, "kind": "fixed", "since": ms(-5), "until": until.map(ms),
                 "needs": needs, "canStart": false, "canDone": canDone, "doneAfter": ms(doneAfter),
+                "snoozedUntil": snoozedUntil.map(ms),
             ]
             let data = try! JSONSerialization.data(withJSONObject: fields.mapValues { $0 ?? NSNull() })
             return try! JSONDecoder().decode(Keepout.self, from: data)
@@ -64,6 +66,7 @@ enum Snapshot {
             ("keepout-done", lock("wash face, brush teeth", needs: ["done"], until: nil, doneAfter: -5, canDone: true), sleepNext),
             ("keepout-wait", lock("evening outing and dinner", needs: ["away", "photo"], until: nil, doneAfter: 11.97, canDone: false), nil),
             ("keepout-sleep", lock("sleep", needs: [], until: 521.2, doneAfter: -60, canDone: false), nil),
+            ("keepout-wake", lock("wake up", needs: ["wake"], until: nil, doneAfter: -5, canDone: false, snoozedUntil: 25), nil),
         ]
         for (file, lock, next) in locks {
             let view = KeepoutView(lock: lock, next: next, now: now, busy: false, problem: nil, done: {})

@@ -11,11 +11,13 @@ struct Keepout: Decodable, Equatable {
     let canStart: Bool
     let canDone: Bool
     let doneAfter: Date
+    /// While set and ahead of now, the wake alarm stays quiet; the lock stays.
+    let snoozedUntil: Date?
 
     var remainingNeeds: [String] { needs.filter { $0 == "done" || !have.contains($0) } }
 
     private enum CodingKeys: String, CodingKey {
-        case key, name, kind, since, until, needs, have, canStart, canDone, doneAfter
+        case key, name, kind, since, until, needs, have, canStart, canDone, doneAfter, snoozedUntil
     }
 
     init(from decoder: Decoder) throws {
@@ -30,6 +32,7 @@ struct Keepout: Decodable, Equatable {
         canStart = try c.decode(Bool.self, forKey: .canStart)
         canDone = try c.decode(Bool.self, forKey: .canDone)
         doneAfter = Date(timeIntervalSince1970: try c.decode(Double.self, forKey: .doneAfter) / 1000)
+        snoozedUntil = try c.decodeIfPresent(Double.self, forKey: .snoozedUntil).map { Date(timeIntervalSince1970: $0 / 1000) }
     }
 }
 
@@ -46,6 +49,7 @@ extension Keepout: Encodable {
         try c.encode(canStart, forKey: .canStart)
         try c.encode(canDone, forKey: .canDone)
         try c.encode(doneAfter.timeIntervalSince1970 * 1000, forKey: .doneAfter)
+        try c.encodeIfPresent(snoozedUntil.map { $0.timeIntervalSince1970 * 1000 }, forKey: .snoozedUntil)
     }
 }
 
