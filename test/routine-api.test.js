@@ -214,6 +214,13 @@ test('your own board items carry when their keepout locks', async (t) => {
   assert.equal((await locks())[1][1], null);
 });
 
+test('identical same-start moments keep their own lock markers', async (t) => {
+  const { enable, call } = setup(t);
+  await enable('12:00-13:00 Free\n13:00 Ping\n13:00 Ping !\n13:00-14:00 Free');
+  assert.deepEqual((await call('GET', '/api/board')).body.people[0].items.map(({ name, lock }) => [name, lock ?? null]),
+    [['Free', null], ['Ping', null], ['Ping', instant('13:00')], ['Free', null]]);
+});
+
 test('the board reloads enabled owners materialized after its people snapshot', async (t) => {
   const { enable, call, at, DB } = setup(t);
   await enable();

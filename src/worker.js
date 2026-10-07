@@ -760,8 +760,8 @@ async function board(env, me) {
       me: row.sub === me.sub,
       visibility: row.visibility,
       items: !current ? [] : locks ? items.map((item) => {
-        const lock = locks.get(`${item.start} ${item.end} ${item.name}`);
-        return lock === undefined ? item : { ...item, lock };
+        const lock = locks.get(`${item.start} ${item.end} ${item.name}`)?.shift();
+        return lock == null ? item : { ...item, lock };
       }) : items,
     });
   }
@@ -769,12 +769,17 @@ async function board(env, me) {
   return { now, people };
 }
 
-/** When each still-owed keepout locks, keyed like a board item; as on the routine page. */
+/**
+ * When each still-owed keepout locks, as on the routine page. Keyed like a
+ * board item; identical rows (same-start moments) take their entries in order.
+ */
 function boardLocks(today) {
   const locks = new Map();
   for (const item of today?.items ?? []) {
-    if (!item.keepout || ['bypassed', 'done', 'past'].includes(item.phase)) continue;
-    locks.set(`${item.start} ${item.end} ${item.name}`, item.kind === 'window' ? item.end : item.start);
+    const key = `${item.start} ${item.end} ${item.name}`;
+    const owed = item.keepout && !['bypassed', 'done', 'past'].includes(item.phase);
+    if (!locks.has(key)) locks.set(key, []);
+    locks.get(key).push(owed ? (item.kind === 'window' ? item.end : item.start) : null);
   }
   return locks;
 }
