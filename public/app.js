@@ -5,6 +5,7 @@ const $ = (selector) => document.querySelector(selector);
 const el = {
   tabMine: $('#tabMine'),
   tabEveryone: $('#tabEveryone'),
+  main: $('#main'),
   viewMine: $('#viewMine'),
   viewEveryone: $('#viewEveryone'),
   focus: $('#focus'),
@@ -171,6 +172,7 @@ function applyProfile(profile) {
     renderPreview();
   }
   renderMine(true);
+  el.main.removeAttribute('aria-busy');
 }
 
 async function loadProfile() {
@@ -890,4 +892,7 @@ setInterval(() => {
 translatePage();
 renderAlert();
 setView(state.view);
-loadProfile().catch((error) => showToast(error.message));
+loadProfile().catch((error) => {
+  showToast(error.message);
+  el.main.removeAttribute('aria-busy');
+});

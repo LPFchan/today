@@ -282,6 +282,15 @@ svg {
   stroke-width: 2;
 }
 
+/* Until the app has read the plan, the page has nothing true to show: no
+   selected tab, no initial, no timer. Keep those out of sight instead of
+   flashing placeholders. */
+.tabs:not(:has([aria-current])),
+.avatar:empty,
+main[aria-busy='true'] {
+  visibility: hidden;
+}
+
 .tabs {
   display: inline-flex;
   padding: 3px;
