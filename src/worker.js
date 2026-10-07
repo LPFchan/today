@@ -753,15 +753,35 @@ async function board(env, me) {
     if (routine.row?.enabled) row = await person(env, row.sub);
     const items = itemsOf(row);
     const current = items.length && items.at(-1).end > now - BOARD_KEEP_MS;
+    // Your own keepouts only; friends see plain items.
+    const locks = row.sub === me.sub ? boardLocks(routine.today) : null;
     people.push({
       name: row.name,
       me: row.sub === me.sub,
       visibility: row.visibility,
-      items: current ? items : [],
+      items: !current ? [] : locks ? items.map((item) => {
+        const lock = locks.get(`${item.start} ${item.end} ${item.name}`)?.shift();
+        return lock == null ? item : { ...item, lock };
+      }) : items,
     });
   }
   people.sort((a, b) => Number(b.me) - Number(a.me));
   return { now, people };
+}
+
+/**
+ * When each still-owed keepout locks, as on the routine page. Keyed like a
+ * board item; identical rows (same-start moments) take their entries in order.
+ */
+function boardLocks(today) {
+  const locks = new Map();
+  for (const item of today?.items ?? []) {
+    const key = `${item.start} ${item.end} ${item.name}`;
+    const owed = item.keepout && !['bypassed', 'done', 'past'].includes(item.phase);
+    if (!locks.has(key)) locks.set(key, []);
+    locks.get(key).push(owed ? (item.kind === 'window' ? item.end : item.start) : null);
+  }
+  return locks;
 }
 
 /** The caller's schedule for the watch: [startSec, endSec, name] rows. */

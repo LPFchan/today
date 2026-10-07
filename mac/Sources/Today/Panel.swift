@@ -195,7 +195,18 @@ private struct Upcoming: View {
                         Text(Format.clock(item.start))
                             .font(.system(size: 12).monospacedDigit())
                             .foregroundStyle(.secondary)
-                        Text(item.name).font(.system(size: 12)).lineLimit(1)
+                        Text(item.name).font(.system(size: 12)).lineLimit(1).truncationMode(.tail)
+                        if let lock = item.lock {
+                            Spacer(minLength: 4)
+                            HStack(spacing: 2) {
+                                Image(systemName: "lock.fill")
+                                Text(Format.clock(lock))
+                            }
+                                .font(.system(size: 11).monospacedDigit())
+                                .foregroundStyle(.secondary)
+                                .fixedSize()
+                                .help(String(format: L10n.tr("Keepout from %@"), Format.clock(lock)))
+                        }
                     }
                 }
                 let more = items.filter { $0.start > now }.count - rest.count

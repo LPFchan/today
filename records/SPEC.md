@@ -54,7 +54,8 @@ flash-and-chime when an item ends.
   routine; edits to the plan stick until the next day.
 - Auto-routine is per person and off by default. People without it see no
   difference anywhere. Keepout state and progress are private to their
-  owner; the board shows only the plan.
+  owner; the board shows others only the plan, and your own items carry
+  when each still-owed keepout locks (`lock`, epoch ms).
 - `GET /api/keepout` defaults to JSON (`now`, `day`, `keepout`). With
   `Accept: text/plain`, it returns 200 with `text/plain; charset=utf-8`:
   an empty body when free, or one newline-terminated `today keepout:` line

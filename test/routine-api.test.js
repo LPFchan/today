@@ -196,7 +196,29 @@ test('enabling materializes the routine into the profile, watch and public board
   assert.deepEqual(board.people, [{ name: 'owner', me: false, visibility: 'public',
     items: items.map(({ start, end, name }) => ({ start, end, name })) }]);
   assert.equal(JSON.stringify(board).includes('keepout'), false);
+  assert.equal(JSON.stringify(board).includes('lock'), false);
   assert.equal(DB.raw.prepare('SELECT materialized_day FROM routines').get().materialized_day, '2026-10-05');
+});
+
+test('your own board items carry when their keepout locks', async (t) => {
+  const { enable, call, at } = setup(t);
+  await enable();
+  const locks = async () => (await call('GET', '/api/board')).body.people[0].items
+    .map(({ name, lock }) => [name, lock ?? null]);
+  // Wake ended before opting in; Meal is a window, so it locks at its end.
+  assert.deepEqual(await locks(), [
+    ['Wake', null], ['Meal', instant('14:00')], ['Free', null], ['Sleep', instant('02:30', '2026-10-06')],
+  ]);
+  at('12:40');
+  await call('POST', '/api/routine/done', { day: '2026-10-05', key: (await call('GET', '/api/routine')).body.today.items[1].key });
+  assert.equal((await locks())[1][1], null);
+});
+
+test('identical same-start moments keep their own lock markers', async (t) => {
+  const { enable, call } = setup(t);
+  await enable('12:00-13:00 Free\n13:00 Ping\n13:00 Ping !\n13:00-14:00 Free');
+  assert.deepEqual((await call('GET', '/api/board')).body.people[0].items.map(({ name, lock }) => [name, lock ?? null]),
+    [['Free', null], ['Ping', null], ['Ping', instant('13:00')], ['Free', null]]);
 });
 
 test('the board reloads enabled owners materialized after its people snapshot', async (t) => {
@@ -1062,8 +1084,8 @@ test('routine materialization preserves moments in the profile, board and watch 
   assert.deepEqual(watch[1], [instant('12:00') / 1000, instant('12:30') / 1000, 'wash face, brush teeth']);
   const board = (await call('GET', '/api/board')).body.people[0].items;
   assert.equal(board.length, 8);
-  assert.deepEqual(board[0], { start: instant('12:00'), end: instant('12:00'), name: 'wake up' });
-  assert.deepEqual(board[1], { start: instant('12:00'), end: instant('12:30'), name: 'wash face, brush teeth' });
+  assert.deepEqual(board[0], { start: instant('12:00'), end: instant('12:00'), name: 'wake up', lock: instant('12:00') });
+  assert.deepEqual(board[1], { start: instant('12:00'), end: instant('12:30'), name: 'wash face, brush teeth', lock: instant('12:00') });
 });
 
 test('proof collectors see only an eligible item and its window', async (t) => {

@@ -20,11 +20,11 @@ enum Snapshot {
             Person(name: "yeowool", me: true, visibility: "public", items: [
                 Item(start: at(-150), end: at(-60), name: "Email"),
                 Item(start: at(-60), end: at(23.2), name: "Deep work on the Mac app"),
-                Item(start: at(23.2), end: at(83.2), name: "Lunch"),
+                Item(start: at(23.2), end: at(83.2), name: "evening outing and dinner", lock: at(83.2)),
                 Item(start: at(83.2), end: at(143.2), name: "Guitar"),
-                Item(start: at(160), end: at(220), name: "Groceries"),
-                Item(start: at(220), end: at(300), name: "Mix the demo"),
-                Item(start: at(300), end: at(360), name: "Dinner"),
+                Item(start: at(160), end: at(160), name: "Groceries"),
+                Item(start: at(220), end: at(300), name: "wash face, brush teeth", lock: at(220)),
+                Item(start: at(300), end: at(360), name: "sleep", lock: at(300)),
             ]),
             Person(name: "marie", me: false, visibility: "public", items: [
                 Item(start: at(-30), end: at(-5), name: "Coffee"),
@@ -41,6 +41,7 @@ enum Snapshot {
             onboarding.step = step
             save(OnboardingView(onboarding: onboarding, model: model), dark: true, to: dir.appending(path: "onboarding-\(index + 1).png"))
         }
+        model.selection = Person.meID
         let panel = Panel(model: model, updater: updater).background(Color(nsColor: .windowBackgroundColor))
         save(panel, dark: true, to: dir.appending(path: "panel-dark.png"))
         save(panel, dark: false, to: dir.appending(path: "panel-light.png"))
