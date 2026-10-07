@@ -5,6 +5,7 @@ const $ = (selector) => document.querySelector(selector);
 const el = {
   tabMine: $('#tabMine'),
   tabEveryone: $('#tabEveryone'),
+  main: $('#main'),
   viewMine: $('#viewMine'),
   viewEveryone: $('#viewEveryone'),
   focus: $('#focus'),
@@ -171,13 +172,21 @@ function applyProfile(profile) {
     renderPreview();
   }
   renderMine(true);
+  el.main.removeAttribute('aria-busy');
 }
 
 async function loadProfile() {
   state.profileAt = Date.now();
   const seq = state.profileSeq;
   const read = ++state.profileReads;
-  const profile = await request('GET', '/api/me');
+  let profile;
+  try {
+    profile = await request('GET', '/api/me');
+  } catch (error) {
+    // The latest read failing ends the wait: show the empty page, not nothing.
+    if (read === state.profileReads) el.main.removeAttribute('aria-busy');
+    throw error;
+  }
   // Only the latest read applies, and not if a save landed meanwhile.
   if (read === state.profileReads && state.profileSeq === seq) applyProfile(profile);
 }
