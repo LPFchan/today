@@ -36,6 +36,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-07:
+  - Change: Hermes can skip an open window early, before it locks: `GET /api/keepout?open` names it (PR #25, Worker `20c132d6`) and brief's `routine_skip` item scope uses it when nothing is locked (brief PR #21, Hermes gateway restarted).
+  - Why it matters: the operator can skip an outing ahead of time instead of waiting for it to lock. Hermes actions still have no undo; the operator deferred that.
+
+- 2026-10-07:
   - Change: the web page no longer flashes its placeholder views (the 00:00 skeleton, then the empty plan prompt) before the plan loads; `main` stays invisible until the first profile read settles (PR #24, Worker `40d8b6d7`).
   - Why it matters: every load showed two wrong screens first. Verified with a throttled phone-size headless recording; the signed-in production page was not directly checked.
 
