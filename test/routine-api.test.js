@@ -1299,3 +1299,20 @@ test('only a wake lock can be snoozed', async (t) => {
   await enable('12:00 Wash ! until done');
   expectError(await call('POST', '/api/routine/snooze', { minutes: 5 }), 409, 'not_needed');
 });
+
+test('an early wake window takes the proof from 09:00 and the profile carries Done-able locks', async (t) => {
+  const { enable, call, at, status } = setup(t, '08:00');
+  const early = DEFAULT_ROUTINE.replace('12:00 wake up', '09:00..12:00 wake up')
+    .replace('03:00-12:00 sleep', '03:00-09:00 sleep');
+  assert.equal((await enable(early)).status, 200);
+  at('09:30');
+  assert.equal((await call('GET', '/api/me')).body.keepout, null);
+  assert.equal((await call('POST', '/api/routine/proof', { proof: 'wake' })).status, 200);
+  at('12:00');
+  const me = (await call('GET', '/api/me')).body;
+  assert.equal(me.routineDay, '2026-10-05');
+  assert.equal(me.keepout.key, '12:00');
+  assert.deepEqual(me.keepout.needs, ['done']);
+  assert.equal((await status('done', me.keepout.key)).status, 200);
+  assert.equal((await call('GET', '/api/me')).body.keepout, null);
+});

@@ -4,7 +4,7 @@
 - Canonical repo: https://github.com/LPFchan/today
 - Project id: today
 - Operator: LPFchan (yeowool)
-- Last updated: 2026-10-06
+- Last updated: 2026-10-08
 - Related decisions: DEC-20260923-001, DEC-20260923-003, DEC-20261005-001, DEC-20261005-002
 
 ## Thesis
@@ -23,7 +23,8 @@ flash-and-chime when an item ends.
 ## Surfaces
 
 - `today.lost.plus/` — your timer and today's list. `E` edits, `F` goes full
-  screen.
+  screen. While an auto-routine lock needs only Done (the cases the Mac
+  overlay's Done covers), a Done button sits under the timer.
 - `today.lost.plus/everyone` — a shared timeline: every public person's day on
   one hour axis, with what they're doing now.
 - “Today’s plan” shows auto-routine’s on/off status and a settings link to
@@ -56,6 +57,8 @@ flash-and-chime when an item ends.
   difference anywhere. Keepout state and progress are private to their
   owner; the board shows others only the plan, and your own items carry
   when each still-owed keepout locks (`lock`, epoch ms).
+- With auto-routine on, `GET /api/me` adds `routineDay` and `keepout` (your
+  current lock or null), the same lock `GET /api/keepout` reports.
 - `GET /api/keepout` defaults to JSON (`now`, `day`, `keepout`). With
   `Accept: text/plain`, it returns 200 with `text/plain; charset=utf-8`:
   an empty body when free, or one newline-terminated `today keepout:` line

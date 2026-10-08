@@ -1,5 +1,6 @@
 import { lang, t, translatePage } from './i18n.js';
 import { ScheduleError, absoluteItems, dayState, formatClock, parseSchedule, serializeSchedule } from './schedule.js';
+import { remainingNeeds } from './routine.js';
 
 const $ = (selector) => document.querySelector(selector);
 const el = {
@@ -15,6 +16,7 @@ const el = {
   taskName: $('#taskName'),
   timer: $('#timer'),
   nextLine: $('#nextLine'),
+  keepoutDone: $('#keepoutDone'),
   progressTrack: $('#progressTrack'),
   progressFill: $('#progressFill'),
   progressText: $('#progressText'),
@@ -67,6 +69,9 @@ const state = {
   me: null, // { sub, name, email }
   visibility: 'private',
   routineEnabled: null, // unknown until the signed-in profile is read
+  routineDay: null, // the auto-routine day the lock below belongs to
+  keepout: null, // my current auto-routine lock, if any
+  markingDone: false,
   savingPlan: false,
   schedule: null, // { text, anchor }
   items: [], // absolute items of my schedule
@@ -159,6 +164,8 @@ function applyProfile(profile) {
   state.visibility = profile.visibility;
   const wasRoutine = state.routineEnabled;
   state.routineEnabled = typeof profile.routineEnabled === 'boolean' ? profile.routineEnabled : null;
+  state.routineDay = profile.routineDay ?? null;
+  state.keepout = profile.keepout ?? null;
   state.schedule = profile.schedule;
   state.items = profile.schedule ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor) : [];
   if (!samePlan) state.completed = null;
@@ -268,8 +275,13 @@ function renderMine(forceList = false) {
 
   if (state.completed !== null && day.completed > state.completed) flash();
   const listChanged = forceList || state.completed !== day.completed || state.lastIndex !== day.index;
+  // Routine locks begin and end on item boundaries; re-read mine once one passes.
+  if (!forceList && state.routineEnabled && state.completed !== null && listChanged) {
+    setTimeout(() => loadProfile().catch(() => {}), 2000);
+  }
   state.completed = day.completed;
   state.lastIndex = day.index;
+  renderKeepoutDone(now);
 
   const empty = day.kind === 'empty';
   el.focus.classList.toggle('is-empty', empty);
@@ -316,6 +328,36 @@ function renderMine(forceList = false) {
   }
 
   if (listChanged) renderAgenda(day);
+}
+
+// Like the Mac overlay: Done shows once it's all a lock still needs.
+function renderKeepoutDone(now) {
+  const lock = state.keepout;
+  const show = Boolean(lock) && remainingNeeds(lock).join() === 'done';
+  el.keepoutDone.hidden = !show;
+  if (!show) return;
+  // The countdown reaching zero is enough; the server checks again on Done.
+  const seconds = Math.max(0, Math.ceil((lock.doneAfter - now) / 1000));
+  el.keepoutDone.disabled = state.markingDone || seconds > 0;
+  el.keepoutDone.textContent = seconds > 0
+    ? t('routineDoneIn', { left: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` })
+    : t('done');
+  el.keepoutDone.setAttribute('aria-label', t('routineDoneItem', { name: lock.name }));
+}
+
+async function markDone() {
+  const lock = state.keepout;
+  if (!lock || state.markingDone) return;
+  state.markingDone = true;
+  renderKeepoutDone(Date.now());
+  try {
+    await request('POST', '/api/routine/done', { day: state.routineDay, key: lock.key });
+  } catch (error) {
+    showToast(error.message);
+  }
+  state.markingDone = false;
+  await loadProfile().catch(() => {});
+  renderKeepoutDone(Date.now());
 }
 
 function renderAgenda(day) {
@@ -517,8 +559,9 @@ function fill(key, nodes) {
 }
 
 function scheduleMessage(code, line) {
-  const message = t(`err_${code}`);
-  if (message === `err_${code}`) return t('offline');
+  let message = t(`err_${code}`);
+  if (message === `err_${code}`) message = t(`routineErr_${code}`);
+  if (message === `routineErr_${code}`) return t('offline');
   return line ? t('errLine', { line }) + message : message;
 }
 
@@ -824,6 +867,7 @@ el.planInput.addEventListener('keydown', (event) => {
   }
 });
 el.clearButton.addEventListener('click', clearPlan);
+el.keepoutDone.addEventListener('click', markDone);
 el.editorForm.addEventListener('change', (event) => {
   if (event.target.name === 'visibility') setVisibility(event.target.value);
 });
@@ -891,7 +935,8 @@ setInterval(() => {
   if (document.visibilityState !== 'visible' || state.view !== 'mine' || !state.me) return;
   const now = Date.now();
   const kind = dayState(state.items, now).kind;
-  if (kind === 'finished' || kind === 'empty' || now - state.profileAt >= PLAN_REFRESH_MS) {
+  // A lock can lift elsewhere (the Mac, Hermes), so check every minute while one holds.
+  if (kind === 'finished' || kind === 'empty' || state.keepout || now - state.profileAt >= PLAN_REFRESH_MS) {
     loadProfile().catch(() => {});
   }
 }, PLAN_CHECK_MS);
