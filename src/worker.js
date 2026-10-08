@@ -159,12 +159,15 @@ async function profile(env, me) {
   const routine = await currentRoutine(env, me);
   let row = await person(env, me.sub);
   if (!row || row.name !== me.name) row = await upsertPerson(env, me);
-  return {
+  const result = {
     me: { sub: me.sub, name: me.name, email: me.email },
     visibility: row.visibility,
     routineEnabled: Boolean(routine.row?.enabled),
     schedule: row.schedule ? { text: row.schedule, anchor: row.anchor } : null,
   };
+  // Your own lock, so the timer page can offer Done the way the Mac overlay does.
+  if (routine.today) Object.assign(result, { routineDay: routine.today.day, keepout: routine.today.keepout });
+  return result;
 }
 
 async function saveSchedule(request, env, me) {

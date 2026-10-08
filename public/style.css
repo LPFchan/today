@@ -500,6 +500,19 @@ main[aria-busy='true'] {
   overflow-wrap: anywhere;
 }
 
+.keepout-done {
+  min-width: 140px;
+  font-variant-numeric: tabular-nums;
+}
+
+.keepout-done[hidden] {
+  display: none;
+}
+
+.keepout-done:disabled {
+  cursor: not-allowed;
+}
+
 .day-progress {
   display: flex;
   width: min(420px, 100%);
