@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: 2026-10-07
+- Last updated: 2026-10-08
 - Overall posture: `active`
 - Current focus: the operator's first days on auto-routine; marie's first sign-ins
 - Highest-priority blocker: none
@@ -34,6 +34,12 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-08:
+  - Change: the timer page shows a Done button under the timer while your lock needs only Done, the same cases as the Mac overlay; `/api/me` carries `routineDay` and `keepout` for people with auto-routine on (PR #27, `890c8ce`, Worker `556643b2`).
+  - Why it matters: wash-face locks can be finished from any browser. Checked against a local Worker at desktop and phone widths; the signed-in production page was not directly checked.
+  - Change: the operator's routine wakes in a 09:00..12:00 window and sleep locks 03:00–09:00, staged as a pending edit from 2026-10-09.
+  - Why it matters: waking early no longer needs a whole-day skip (10-07). A wake proof through Hermes any time from 09:00 finishes it; without one it locks and rings at 12:00 as before.
 
 - 2026-10-07:
   - Change: the Mac panel no longer slides sideways when you switch people; the menu bar keeps the timer it had when the panel opened and switches after it closes (PR #26, `a12acf8`).
