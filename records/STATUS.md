@@ -17,7 +17,7 @@ Worker (D1 `today`), hub registry row `today.lost.plus` (alias and scope
 answer in production. The Pebble app signs in through the hub's device login;
 Marie's watch is paired and reading its plan.
 
-The Mac menu bar app is released as mac-v2.1.4 (`Today.dmg` on GitHub, signed
+The Mac menu bar app is released as mac-v2.1.5 (`Today.dmg` on GitHub, signed
 Sparkle feed on the `mac-appcast` branch). On the Mac mini it launches, checks the
 feed, and its sign-in reaches the hub's login page over a loopback port; a
 full sign-in with an account hasn't happened yet. The gateway accepts the
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-12:
+  - Change: the Mac wake lock has I’m up, which stops the alarm and sends the wake proof for the shown lock (PR #28, `7c55c73`). While the alarm is snoozed the screen shows only when it rings again; the snooze buttons return once it rings (PR #29, `19b6a25`).
+  - Why it matters: the operator can turn the alarm off with one click instead of going through Hermes. Checked with dumpling debug builds and snapshots, not against a live ringing alarm. Operator-approved mac-v2.1.5 is published from `19b6a25` (Sparkle build 79, run `38201733730`).
 
 - 2026-10-08:
   - Change: the timer page shows a Done button under the timer while your lock needs only Done, the same cases as the Mac overlay; `/api/me` carries `routineDay` and `keepout` for people with auto-routine on (PR #27, `890c8ce`, Worker `556643b2`).
