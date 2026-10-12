@@ -11,8 +11,10 @@ It is an OAuth client of the auth hub: it registers a client, opens the
 hub's consent page, and catches the code on a loopback port
 (`http://127.0.0.1:<port>/callback`). The token is bound to
 `https://today.lost.plus/mcp` with scope `today`. It reads `/api/board` and
-`/api/keepout`, and marks its owner’s routine item done through
-`/api/routine/done`; the gateway accepts its bearer token on these routes.
+`/api/keepout`, marks its owner’s routine item done through
+`/api/routine/done`, and sends the wake proof and snoozes through
+`/api/routine/proof` and `/api/routine/snooze`; the gateway accepts its
+bearer token on these routes.
 Tokens sit in
 `~/Library/Application Support/today/tokens.json` (mode 600).
 
@@ -48,8 +50,10 @@ is absent from release builds. Do not run this preview on a shared host.
 A keepout needing `wake` loops Radial, the ringtone that ships with macOS
 (ToneLibrary's `Radial-EncoreInfinitum.m4r`). Each launch copies it to
 `~/Library/Application Support/today/` in case a later macOS moves it; Glass
-loops if neither is readable. Nothing is downloaded. Keepout polls every three seconds while
-ringing, so Done from the web or Hermes also stops it.
+loops if neither is readable. Nothing is downloaded. I’m up on the lock
+screen sends the wake proof and stops it; snoozing quiets it for 5, 30 or 60
+minutes. Keepout polls every three seconds while ringing, so a wake proof
+through Hermes also stops it.
 
 The default output is unmuted and ramps from 20% to 50% (half the volume
 slider) over 5 seconds.

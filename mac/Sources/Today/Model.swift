@@ -313,9 +313,22 @@ final class Model {
         }
     }
 
+    /// Turn the alarm off by sending the wake proof.
+    func wake() {
+        guard keepout != nil, !finishing else { return }
+        stopWakeAlarm()
+        if preview { clearKeepout(); return }
+        send { try await Account.wake() }
+    }
+
     /// Quiet the wake alarm for a while; the lock stays until the wake proof.
     func snooze(minutes: Int) {
         guard keepout != nil, !finishing, !preview else { return }
+        send { try await Account.snooze(minutes: minutes) }
+    }
+
+    /// Post a wake-lock action, then re-read the lock.
+    private func send(_ action: @escaping () async throws -> Void) {
         finishing = true
         finishProblem = nil
         let current = generation
@@ -325,11 +338,13 @@ final class Model {
             guard current == generation else { return }
             var failure: String?
             do {
-                try await Account.snooze(minutes: minutes)
+                try await action()
             } catch Account.Failure.signedOut {
                 guard current == generation else { return }
                 authenticationExpired()
                 return
+            } catch Account.Failure.conflict(let error) {
+                failure = error == "too_soon" ? L10n.tr("Not yet") : L10n.tr("Refreshing…")
             } catch {
                 failure = error.localizedDescription
             }

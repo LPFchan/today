@@ -86,6 +86,7 @@ flash-and-chime when an item ends.
   `GET /api/keepout`, whose keepout carries `snoozedUntil` while the snooze runs.
   Snoozing again restarts from now. The Mac alarm and dumpling's fallback stay
   silent until then; the Mac lock screen and Hermes (`wake_snooze`) offer it.
+  The Mac lock screen's I’m up sends the wake proof itself (note `mac`).
 - `POST /api/routine/affordance {action, day, key?, reason, requestId}` accepts
   explicit current-day `bypass`, `skip_day` or `off` controls. Bypass uses the exact
   item key; skip_day and off omit it. skip_day ends the rest of the current routine

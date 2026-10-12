@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// What covers the main screen while a keepout item holds the lock: the item,
-/// what lifts it, a countdown when time is what lifts it, and Done for
-/// items that take it.
+/// what lifts it, a countdown when time is what lifts it, Done for items
+/// that take it, and I'm up for the wake alarm.
 struct KeepoutView: View {
     let lock: Keepout
     let next: Item?
@@ -12,6 +12,7 @@ struct KeepoutView: View {
     let done: () -> Void
     /// The notch's height on screens that have one.
     var topInset: CGFloat = 0
+    var wake: () -> Void = {}
     var snooze: (Int) -> Void = { _ in }
 
     var body: some View {
@@ -37,22 +38,11 @@ struct KeepoutView: View {
                     if let left = countdown {
                         clock(left).padding(.top, 40)
                     }
-                    if lock.needs.contains("done") {
-                        Button(action: done) {
-                            Text(L10n.tr("Done"))
-                                .font(.system(size: 19, weight: .semibold))
-                                .foregroundStyle(canDone ? .white : Self.muted)
-                                .padding(.horizontal, 44)
-                                .padding(.vertical, 16)
-                                .background(canDone ? accent : Self.disabled, in: .rect(cornerRadius: 14))
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(!canDone)
-                        .keyboardShortcut(.defaultAction)
-                        .padding(.top, 44)
-                    }
                     if lock.remainingNeeds.contains("wake") {
-                        snoozeControls.padding(.top, 44)
+                        primary(L10n.tr("I’m up"), enabled: !busy, action: wake).padding(.top, 44)
+                        snoozeControls.padding(.top, 20)
+                    } else if lock.needs.contains("done") {
+                        primary(L10n.tr("Done"), enabled: canDone, action: done).padding(.top, 44)
                     }
                     if let problem {
                         Text(problem)
@@ -76,7 +66,21 @@ struct KeepoutView: View {
         .environment(\.colorScheme, .dark)
     }
 
-    /// Quiets the alarm, not the lock: the wake proof still unlocks it.
+    private func primary(_ title: String, enabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 19, weight: .semibold))
+                .foregroundStyle(enabled ? .white : Self.muted)
+                .padding(.horizontal, 44)
+                .padding(.vertical, 16)
+                .background(enabled ? accent : Self.disabled, in: .rect(cornerRadius: 14))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .keyboardShortcut(.defaultAction)
+    }
+
+    /// Quiets the alarm, not the lock: I'm up unlocks it.
     private var snoozeControls: some View {
         VStack(spacing: 14) {
             if let until = lock.snoozedUntil, until > now {
