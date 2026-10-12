@@ -49,6 +49,8 @@ final class Model {
 
     @ObservationIgnored private let live: Bool
     @ObservationIgnored private var wakeAlarm: WakeAlarm?
+    /// The lock whose I'm up is in flight; it stays quiet meanwhile.
+    @ObservationIgnored private var wakeSent: (day: String, key: String)?
     /// When each person's running item started, as of the last tick; nil
     /// until a board has loaded, so launching doesn't announce what's
     /// already running.
@@ -161,7 +163,12 @@ final class Model {
     private func syncWakeAlarm() {
         guard live else { return }
         wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true
-            && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false))
+            && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false)
+            && !acknowledged(keepout))
+    }
+
+    private func acknowledged(_ lock: Keepout?) -> Bool {
+        wakeSent.map { $0.key == lock?.key && $0.day == keepoutDay } ?? false
     }
 
     /// Restore system audio before a normal termination, logout or restart.
@@ -253,6 +260,8 @@ final class Model {
             }
             keepout = reply.keepout
             keepoutDay = reply.day
+            // An accepted I'm up holds until a reply shows its proof or another lock.
+            if !acknowledged(reply.keepout) || reply.keepout?.have.contains("wake") == true { wakeSent = nil }
             if keepout != nil, !enforcing {
                 enforcing = true
                 UserDefaults.standard.set(true, forKey: "enforcing")
@@ -313,23 +322,45 @@ final class Model {
         }
     }
 
+    /// Turn the alarm off by sending the wake proof.
+    func wake() {
+        guard let lock = keepout, !finishing else { return }
+        stopWakeAlarm()
+        if preview { clearKeepout(); return }
+        guard let day = keepoutDay else { return }
+        wakeSent = (day, lock.key)
+        send(key: lock.key) { try await Account.wake(day: day, key: lock.key) }
+    }
+
     /// Quiet the wake alarm for a while; the lock stays until the wake proof.
     func snooze(minutes: Int) {
-        guard keepout != nil, !finishing, !preview else { return }
+        guard let lock = keepout, !finishing, !preview else { return }
+        send(key: lock.key) { try await Account.snooze(minutes: minutes) }
+    }
+
+    /// Post a wake-lock action for the shown lock, then re-read the lock.
+    private func send(key: String, _ action: @escaping () async throws -> Void) {
         finishing = true
         finishProblem = nil
         let current = generation
         Task {
-            defer { if current == generation { finishing = false } }
+            var sent = false
+            defer {
+                if !sent { wakeSent = nil }
+                if current == generation { finishing = false }
+            }
             await keepoutTask?.value
-            guard current == generation else { return }
+            guard current == generation, keepout?.key == key else { return }
             var failure: String?
             do {
-                try await Account.snooze(minutes: minutes)
+                try await action()
+                sent = true
             } catch Account.Failure.signedOut {
                 guard current == generation else { return }
                 authenticationExpired()
                 return
+            } catch Account.Failure.conflict(let error) {
+                failure = error == "too_soon" ? L10n.tr("Not yet") : L10n.tr("Refreshing…")
             } catch {
                 failure = error.localizedDescription
             }

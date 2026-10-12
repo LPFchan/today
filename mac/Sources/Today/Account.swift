@@ -161,6 +161,11 @@ enum Account {
         _ = try await authorized("api/routine/done", body: body)
     }
 
+    static func wake(day: String, key: String) async throws {
+        let body = try JSONSerialization.data(withJSONObject: ["proof": "wake", "note": "mac", "day": day, "key": key])
+        _ = try await authorized("api/routine/proof", body: body)
+    }
+
     static func snooze(minutes: Int) async throws {
         let body = try JSONSerialization.data(withJSONObject: ["minutes": minutes])
         _ = try await authorized("api/routine/snooze", body: body)
