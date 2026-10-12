@@ -80,14 +80,14 @@ struct KeepoutView: View {
         .keyboardShortcut(.defaultAction)
     }
 
-    /// Quiets the alarm, not the lock: I'm up unlocks it.
-    private var snoozeControls: some View {
-        VStack(spacing: 14) {
-            if let until = lock.snoozedUntil, until > now {
-                Text(String(format: L10n.tr("Snoozed until %@"), Self.time.string(from: until)))
-                    .font(.system(size: 15))
-                    .foregroundStyle(Self.muted)
-            }
+    /// Quiets the alarm, not the lock: I'm up unlocks it. While snoozed it
+    /// shows when the alarm rings again; while ringing, the snooze buttons.
+    @ViewBuilder private var snoozeControls: some View {
+        if let until = lock.snoozedUntil, until > now {
+            Text(String(format: L10n.tr("Snoozed until %@"), Self.time.string(from: until)))
+                .font(.system(size: 15))
+                .foregroundStyle(Self.muted)
+        } else {
             HStack(spacing: 12) {
                 ForEach([5, 30, 60], id: \.self) { minutes in
                     Button { snooze(minutes) } label: {
