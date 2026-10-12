@@ -49,6 +49,8 @@ final class Model {
 
     @ObservationIgnored private let live: Bool
     @ObservationIgnored private var wakeAlarm: WakeAlarm?
+    /// The lock whose I'm up is in flight; it stays quiet meanwhile.
+    @ObservationIgnored private var wakeSent: String?
     /// When each person's running item started, as of the last tick; nil
     /// until a board has loaded, so launching doesn't announce what's
     /// already running.
@@ -161,7 +163,8 @@ final class Model {
     private func syncWakeAlarm() {
         guard live else { return }
         wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true
-            && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false))
+            && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false)
+            && (wakeSent == nil || keepout?.key != wakeSent))
     }
 
     /// Restore system audio before a normal termination, logout or restart.
@@ -315,27 +318,32 @@ final class Model {
 
     /// Turn the alarm off by sending the wake proof.
     func wake() {
-        guard keepout != nil, !finishing else { return }
+        guard let lock = keepout, !finishing else { return }
         stopWakeAlarm()
         if preview { clearKeepout(); return }
-        send { try await Account.wake() }
+        guard let day = keepoutDay else { return }
+        wakeSent = lock.key
+        send(key: lock.key) { try await Account.wake(day: day, key: lock.key) }
     }
 
     /// Quiet the wake alarm for a while; the lock stays until the wake proof.
     func snooze(minutes: Int) {
-        guard keepout != nil, !finishing, !preview else { return }
-        send { try await Account.snooze(minutes: minutes) }
+        guard let lock = keepout, !finishing, !preview else { return }
+        send(key: lock.key) { try await Account.snooze(minutes: minutes) }
     }
 
-    /// Post a wake-lock action, then re-read the lock.
-    private func send(_ action: @escaping () async throws -> Void) {
+    /// Post a wake-lock action for the shown lock, then re-read the lock.
+    private func send(key: String, _ action: @escaping () async throws -> Void) {
         finishing = true
         finishProblem = nil
         let current = generation
         Task {
-            defer { if current == generation { finishing = false } }
+            defer {
+                wakeSent = nil
+                if current == generation { finishing = false }
+            }
             await keepoutTask?.value
-            guard current == generation else { return }
+            guard current == generation, keepout?.key == key else { return }
             var failure: String?
             do {
                 try await action()
