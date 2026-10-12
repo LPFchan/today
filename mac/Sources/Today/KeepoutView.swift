@@ -39,7 +39,7 @@ struct KeepoutView: View {
                         clock(left).padding(.top, 40)
                     }
                     if lock.remainingNeeds.contains("wake") {
-                        primary(L10n.tr("I’m up"), enabled: !busy, action: wake).padding(.top, 44)
+                        primary(L10n.tr("I’m up"), enabled: !busy && now >= lock.doneAfter, action: wake).padding(.top, 44)
                         snoozeControls.padding(.top, 20)
                     } else if lock.needs.contains("done") {
                         primary(L10n.tr("Done"), enabled: canDone, action: done).padding(.top, 44)

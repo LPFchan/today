@@ -256,6 +256,8 @@ final class Model {
             }
             keepout = reply.keepout
             keepoutDay = reply.day
+            // An accepted I'm up holds until a reply shows its proof or another lock.
+            if reply.keepout?.key != wakeSent || reply.keepout?.have.contains("wake") == true { wakeSent = nil }
             if keepout != nil, !enforcing {
                 enforcing = true
                 UserDefaults.standard.set(true, forKey: "enforcing")
@@ -338,8 +340,9 @@ final class Model {
         finishProblem = nil
         let current = generation
         Task {
+            var sent = false
             defer {
-                wakeSent = nil
+                if !sent { wakeSent = nil }
                 if current == generation { finishing = false }
             }
             await keepoutTask?.value
@@ -347,6 +350,7 @@ final class Model {
             var failure: String?
             do {
                 try await action()
+                sent = true
             } catch Account.Failure.signedOut {
                 guard current == generation else { return }
                 authenticationExpired()
