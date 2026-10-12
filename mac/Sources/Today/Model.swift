@@ -50,7 +50,7 @@ final class Model {
     @ObservationIgnored private let live: Bool
     @ObservationIgnored private var wakeAlarm: WakeAlarm?
     /// The lock whose I'm up is in flight; it stays quiet meanwhile.
-    @ObservationIgnored private var wakeSent: String?
+    @ObservationIgnored private var wakeSent: (day: String, key: String)?
     /// When each person's running item started, as of the last tick; nil
     /// until a board has loaded, so launching doesn't announce what's
     /// already running.
@@ -164,7 +164,11 @@ final class Model {
         guard live else { return }
         wakeAlarm?.setRinging(session == .signedIn && keepout?.needs.contains("wake") == true
             && keepout?.have.contains("wake") != true && !(keepout?.snoozedUntil.map { $0 > now } ?? false)
-            && (wakeSent == nil || keepout?.key != wakeSent))
+            && !acknowledged(keepout))
+    }
+
+    private func acknowledged(_ lock: Keepout?) -> Bool {
+        wakeSent.map { $0.key == lock?.key && $0.day == keepoutDay } ?? false
     }
 
     /// Restore system audio before a normal termination, logout or restart.
@@ -257,7 +261,7 @@ final class Model {
             keepout = reply.keepout
             keepoutDay = reply.day
             // An accepted I'm up holds until a reply shows its proof or another lock.
-            if reply.keepout?.key != wakeSent || reply.keepout?.have.contains("wake") == true { wakeSent = nil }
+            if !acknowledged(reply.keepout) || reply.keepout?.have.contains("wake") == true { wakeSent = nil }
             if keepout != nil, !enforcing {
                 enforcing = true
                 UserDefaults.standard.set(true, forKey: "enforcing")
@@ -324,7 +328,7 @@ final class Model {
         stopWakeAlarm()
         if preview { clearKeepout(); return }
         guard let day = keepoutDay else { return }
-        wakeSent = lock.key
+        wakeSent = (day, lock.key)
         send(key: lock.key) { try await Account.wake(day: day, key: lock.key) }
     }
 
