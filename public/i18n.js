@@ -378,6 +378,15 @@ export function t(key, vars = {}) {
   return template.replace(/\{(\w+)\}/g, (_, name) => String(vars[name] ?? ''));
 }
 
+/** "Unlock by heading out for a while and sending a meal photo." */
+export function unlockSentence(needs) {
+  const phrases = needs.map((need, index) => t(`routineUnlockNeed_${need}_${index === needs.length - 1 ? 'last' : 'then'}`));
+  const instructions = lang === 'ko' || phrases.length < 2
+    ? phrases.join(' ')
+    : `${phrases.slice(0, -1).join(', ')} and ${phrases.at(-1)}`;
+  return t('routineUnlockSentence', { instructions });
+}
+
 /** Fill every [data-t], [data-t-label] and [data-t-placeholder] in the page. */
 export function translatePage(root = document) {
   document.documentElement.lang = lang;
