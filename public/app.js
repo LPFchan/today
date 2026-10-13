@@ -1,4 +1,4 @@
-import { lang, t, translatePage } from './i18n.js';
+import { lang, t, translatePage, unlockSentence } from './i18n.js';
 import { ScheduleError, absoluteItems, dayState, formatClock, parseSchedule, serializeSchedule } from './schedule.js';
 import { remainingNeeds } from './routine.js';
 
@@ -283,10 +283,12 @@ function renderMine(forceList = false) {
   state.lastIndex = day.index;
   renderKeepoutDone(now);
 
-  const empty = day.kind === 'empty';
+  const lock = state.keepout;
+  const empty = day.kind === 'empty' && !lock;
   el.focus.classList.toggle('is-empty', empty);
   el.focusEmpty.hidden = !empty;
-  el.agendaSection.hidden = empty;
+  el.agendaSection.hidden = day.kind === 'empty';
+  el.timer.hidden = false;
 
   if (empty) {
     el.taskName.textContent = t('emptyTitle');
@@ -294,13 +296,23 @@ function renderMine(forceList = false) {
     return;
   }
 
-  const first = items[0].start;
-  const last = items.at(-1).end;
-  const percent = Math.round(Math.max(0, Math.min(1, (now - first) / (last - first))) * 100);
-  el.progressFill.style.width = `${percent}%`;
-  el.progressTrack.setAttribute('aria-valuenow', String(percent));
-  el.progressTrack.setAttribute('aria-label', t('progressLabel'));
-  el.progressText.textContent = `${percent}%`;
+  if (items.length) {
+    const first = items[0].start;
+    const last = items.at(-1).end;
+    const percent = Math.round(Math.max(0, Math.min(1, (now - first) / (last - first))) * 100);
+    el.progressFill.style.width = `${percent}%`;
+    el.progressTrack.setAttribute('aria-valuenow', String(percent));
+    el.progressTrack.setAttribute('aria-label', t('progressLabel'));
+    el.progressText.textContent = `${percent}%`;
+  }
+
+  // A lock outranks the plan: a window that ran out is still owed after its
+  // row ends, so show what holds you and what lifts it, like the Mac overlay.
+  if (lock) {
+    renderLock(lock, now);
+    if (listChanged) renderAgenda(day);
+    return;
+  }
 
   const item = items[day.index];
   const following = day.kind === 'active' ? items[day.index + 1] : null;
@@ -328,6 +340,25 @@ function renderMine(forceList = false) {
   }
 
   if (listChanged) renderAgenda(day);
+}
+
+function renderLock(lock, now) {
+  // Time left only when time is what lifts it: a sleep lock, or a minimum.
+  const left = lock.until > now ? lock.until - now
+    : lock.needs.length && lock.doneAfter > now ? lock.doneAfter - now : null;
+  const needs = remainingNeeds(lock);
+  el.kickerLine.classList.add('is-now');
+  el.kickerLine.textContent = t('routineKeepoutActive');
+  el.taskName.textContent = lock.name;
+  el.timer.hidden = left === null;
+  if (left !== null) {
+    const seconds = Math.ceil(left / 1000);
+    setTimer(countdown(seconds), t('timeLeft', { duration: spokenDuration(seconds) }));
+  }
+  el.nextLine.textContent = needs.length ? unlockSentence(needs)
+    : lock.until !== null ? t('routineUnlockAt', { time: clock(lock.until) })
+      : t('routineWaitingUnlock');
+  document.title = `${t('routineKeepoutActive')} · ${lock.name}`;
 }
 
 // Like the Mac overlay: Done shows once it's all a lock still needs.

@@ -1,4 +1,4 @@
-import { lang, t, translatePage } from './i18n.js';
+import { lang, t, translatePage, unlockSentence } from './i18n.js';
 import { remainingNeeds } from './routine.js';
 
 translatePage();
@@ -82,14 +82,6 @@ function node(tag, className, text) {
   if (className) el.className = className;
   if (text !== undefined) el.textContent = text;
   return el;
-}
-
-function unlockSentence(needs) {
-  const phrases = needs.map((need, index) => t(`routineUnlockNeed_${need}_${index === needs.length - 1 ? 'last' : 'then'}`));
-  const instructions = lang === 'ko' || phrases.length < 2
-    ? phrases.join(' ')
-    : `${phrases.slice(0, -1).join(', ')} and ${phrases.at(-1)}`;
-  return t('routineUnlockSentence', { instructions });
 }
 
 function actionButton(action, item, canAct, doneAfter = 0) {
