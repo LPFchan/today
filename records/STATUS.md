@@ -2,7 +2,7 @@
 
 ## Snapshot
 
-- Last updated: 2026-10-08
+- Last updated: 2026-10-13
 - Overall posture: `active`
 - Current focus: the operator's first days on auto-routine; marie's first sign-ins
 - Highest-priority blocker: none
@@ -34,6 +34,10 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 - Related ids: DEC-20260925-001
 
 ## Recent Changes To Project Reality
+
+- 2026-10-13:
+  - Change: while a lock holds, the timer page shows it instead of the plan row: "Keepout now", the lock's name and what unlocks it, like the Mac overlay; the timer shows only when time lifts it (PR #32, `2a842fa`, Worker `5c417539`).
+  - Why it matters: a window that runs out stays locked past its row, so the page read "free time" during the evening-outing lock. Checked against a local Worker at phone and desktop widths; the signed-in production page was not directly checked.
 
 - 2026-10-12:
   - Change: the Mac wake lock has I’m up, which stops the alarm and sends the wake proof for the shown lock (PR #28, `7c55c73`). While the alarm is snoozed the screen shows only when it rings again; the snooze buttons return once it rings (PR #29, `19b6a25`).
