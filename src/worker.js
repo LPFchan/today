@@ -680,9 +680,15 @@ function proofItem(routine, proof, now) {
   if (!routine.statuses) return null;
   const lock = routine.today.keepout;
   if (lock) return routine.day.items.find((item) => item.key === lock.key && item.until.includes(proof)) ?? null;
-  return routine.day.items.find((item) => item.keepout && item.kind === 'window'
+  return nextWindow(routine, proof, now);
+}
+
+/** The open keepout window taking this proof, else the next one to open. */
+function nextWindow(routine, proof, now) {
+  const window = (phase) => routine.day.items.find((item) => item.keepout && item.kind === 'window'
     && item.until.includes(proof)
-    && itemPhase(routine.day, item, routine.statuses[item.key], now) === 'open') ?? null;
+    && itemPhase(routine.day, item, routine.statuses[item.key], now) === phase);
+  return window('open') ?? window('upcoming') ?? null;
 }
 
 /** Record a caller-verified proof. */
@@ -701,10 +707,7 @@ async function routineProof(request, env, me) {
   }
   const lock = routine.today.keepout;
   const item = explicit ? routine.day.items.find((item) => item.key === body.key)
-    : proofItem(routine, body.proof, now)
-      ?? routine.day.items.find((item) => item.keepout && item.kind === 'window'
-        && item.until.includes(body.proof)
-        && itemPhase(routine.day, item, routine.statuses[item.key], now) === 'open');
+    : proofItem(routine, body.proof, now) ?? nextWindow(routine, body.proof, now);
   if (!item) return json(409, { error: explicit ? 'not_due' : 'not_needed' });
   if (!item.keepout || !item.until.includes(body.proof)) return json(409, { error: 'not_needed' });
   const status = routine.statuses[item.key];
@@ -719,7 +722,8 @@ async function routineProof(request, env, me) {
   if (Object.hasOwn(p.proofs, body.proof)) return response();
   if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
   const phase = itemPhase(routine.day, item, status, now);
-  const early = phase === 'open' && item.kind === 'window';
+  // A window takes its proofs while open or before it opens, so it never locks.
+  const early = (phase === 'open' || phase === 'upcoming') && item.kind === 'window';
   if (phase !== 'locked' && !early) return json(409, { error: 'not_due' });
   if (!early && now < p.doneAfter) return json(409, { error: 'too_soon' });
   // Merge in SQL so simultaneous different proofs cannot overwrite each other.
