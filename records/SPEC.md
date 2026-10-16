@@ -67,9 +67,9 @@ flash-and-chime when an item ends.
   their JSON shape and status.
 - `POST /api/routine/proof {proof, note?}` records a private `wake`, `photo`, or
   `away` proof for the current keepout that needs it, else the open keepout
-  window, else the next one to open. Optional `day` and `key` together select
-  an item explicitly. A window takes proofs before or while it is open, which
-  finishes it before it locks; once locked, proofs follow Done's timing and
+  window, else one opening within the hour. Optional `day` and `key` together
+  select an item explicitly. A window takes proofs while open or up to an hour
+  before it opens, which finishes it before it locks; once locked, proofs follow Done's timing and
   action-order rules. Retries preserve the first timestamp
   and note (up to 200 characters). The response includes the updated item and
   keepout. All required proofs complete an item; an `until done` condition
