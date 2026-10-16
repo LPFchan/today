@@ -1183,7 +1183,11 @@ test('a meal can be logged before its window opens and then never locks', async 
   assert.equal(early.body.item.proofs.photo.at, instant('12:13'));
   at('14:30');
   assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
-  // The next photo goes to the next meal.
+  // The next meal takes a photo only within the hour before it opens.
+  expectError(await proofCall(call, 'photo'), 409, 'not_needed');
+  expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '18:00..19:00' }), 409, 'not_due');
+  assert.equal((await call('GET', '/api/keepout?proof=photo')).body.item, null);
+  at('17:00');
   assert.equal((await proofCall(call, 'photo')).body.item.key, '18:00..19:00');
 });
 

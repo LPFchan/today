@@ -17,7 +17,7 @@
 import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
-  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState, remainingNeeds,
+  DEFAULT_PLACE, DEFAULT_ROUTINE, EARLY_MS, RoutineError, itemPhase, keepoutState, remainingNeeds,
   parseRoutine, placeRoutine, progress, reportInstance, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
@@ -683,10 +683,10 @@ function proofItem(routine, proof, now) {
   return nextWindow(routine, proof, now);
 }
 
-/** The open keepout window taking this proof, else the next one to open. */
+/** The open keepout window taking this proof, else one opening within the hour. */
 function nextWindow(routine, proof, now) {
   const window = (phase) => routine.day.items.find((item) => item.keepout && item.kind === 'window'
-    && item.until.includes(proof)
+    && item.until.includes(proof) && now >= item.start - EARLY_MS
     && itemPhase(routine.day, item, routine.statuses[item.key], now) === phase);
   return window('open') ?? window('upcoming') ?? null;
 }
@@ -722,8 +722,9 @@ async function routineProof(request, env, me) {
   if (Object.hasOwn(p.proofs, body.proof)) return response();
   if (lock && lock.key !== item.key) return json(409, { error: 'locked' });
   const phase = itemPhase(routine.day, item, status, now);
-  // A window takes its proofs while open or before it opens, so it never locks.
-  const early = (phase === 'open' || phase === 'upcoming') && item.kind === 'window';
+  // A window takes its proofs while open or within the hour before, so it never locks.
+  const early = item.kind === 'window' && (phase === 'open'
+    || (phase === 'upcoming' && now >= item.start - EARLY_MS));
   if (phase !== 'locked' && !early) return json(409, { error: 'not_due' });
   if (!early && now < p.doneAfter) return json(409, { error: 'too_soon' });
   // Merge in SQL so simultaneous different proofs cannot overwrite each other.

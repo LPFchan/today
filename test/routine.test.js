@@ -342,8 +342,10 @@ test('a window finished while open is done and never locks', () => {
   assert.equal(itemPhase(day, item, status[item.key], at(day, 13, 5)), 'done');
   assert.equal(keepoutState(day, status, at(day, 15)), null);
   assert.equal(itemPhase(day, item, status[item.key], day.ends), 'done');
-  // Before it opened doesn't count.
-  const tooEarly = { [item.key]: { doneAt: at(day, 12) } };
+  // Within the hour before it opens counts; earlier doesn't.
+  const early = { [item.key]: { doneAt: at(day, 11, 30) } };
+  assert.equal(keepoutState(day, early, at(day, 15)), null);
+  const tooEarly = { [item.key]: { doneAt: at(day, 11, 29) } };
   assert.ok(keepoutState(day, tooEarly, at(day, 15)));
 });
 
