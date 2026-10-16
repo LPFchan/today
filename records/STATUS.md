@@ -36,6 +36,9 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 ## Recent Changes To Project Reality
 
 - 2026-10-16:
+  - Change: early meal logging now opens only an hour before a meal; a photo sent further ahead is refused or goes to a window that is due (PR #34, `74d99c3`, Worker `ab6d82bf`, DEC-20261016-002).
+  - Why it matters: with no limit, a photo right after lunch would have finished dinner.
+- 2026-10-16:
   - Change: a meal can be logged before its window opens; an early photo finishes it, so it never locks. A photo with no item named goes to the open window, else the next one (PR #33, `ddee688`, Worker `8e588b50`, DEC-20261016-001).
   - Why it matters: Hermes refused a 12:13 lunch photo because lunch opened at 12:30. A second photo right after a meal would finish the next one; Hermes decides what counts as a meal.
 
