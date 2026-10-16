@@ -1150,7 +1150,7 @@ test('two-proof lock needs both, exposes have, and allows automatic partial retr
   assert.deepEqual(Object.keys(photo.body.item.proofs), ['away', 'photo']);
 });
 
-test('proof validation rejects bad bodies, wrong days, missing proofs, future items and other locks', async (t) => {
+test('proof validation rejects bad bodies, wrong days, missing proofs and other locks', async (t) => {
   const { enable, call, at } = setup(t, '12:00');
   await enable('12:00 Wake ! until wake\n12:30..14:00 Meal ! until photo');
   for (const body of [null, {}, [], { proof: 'done' }, { proof: 'wake', note: 1 },
@@ -1164,10 +1164,27 @@ test('proof validation rejects bad bodies, wrong days, missing proofs, future it
   expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:00' }), 409, 'not_needed');
   expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:30..14:00' }), 409, 'locked');
   assert.equal((await proofCall(call, 'wake', { note: '🦊'.repeat(200) })).status, 200);
-  expectError(await proofCall(call, 'photo', { day: '2026-10-05', key: '12:30..14:00' }), 409, 'not_due');
-  expectError(await proofCall(call, 'photo'), 409, 'not_needed');
   at('12:30');
   assert.equal((await proofCall(call, 'photo')).status, 200);
+  expectError(await proofCall(call, 'wake', { day: '2026-10-05', key: 'missing' }), 409, 'not_due');
+});
+
+test('a meal can be logged before its window opens and then never locks', async (t) => {
+  const { enable, call, at } = setup(t, '12:00');
+  await enable('12:00 Wake ! until wake\n12:30..14:00 Meal ! until photo\n18:00..19:00 Dinner ! until photo');
+  assert.equal((await proofCall(call, 'wake')).status, 200);
+  at('12:13');
+  assert.deepEqual((await call('GET', '/api/keepout?proof=photo')).body.item,
+    { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'), awayMinutes: null });
+  const early = await proofCall(call, 'photo', { note: 'leftover chicken' });
+  assert.equal(early.status, 200);
+  assert.equal(early.body.item.key, '12:30..14:00');
+  assert.equal(early.body.item.phase, 'done');
+  assert.equal(early.body.item.proofs.photo.at, instant('12:13'));
+  at('14:30');
+  assert.equal((await call('GET', '/api/keepout')).body.keepout, null);
+  // The next photo goes to the next meal.
+  assert.equal((await proofCall(call, 'photo')).body.item.key, '18:00..19:00');
 });
 
 test('proofs respect minimum timing once locked and Done cannot replace them', async (t) => {

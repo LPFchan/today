@@ -331,8 +331,9 @@ export function progress(day, item, status, now) {
   const startedAt = Number.isFinite(status?.startedAt) ? Math.max(item.start, status.startedAt) : null;
   const since = item.kind === 'window' ? Math.min(startedAt ?? item.end, item.end) : item.start;
   const doneAfter = since + item.minMinutes * MINUTE;
-  // A window finished before it locked never locks at all.
-  const counts = (at) => Number.isFinite(at) && at >= item.start && at < day.ends && at <= now
+  // A window finished before it locked, even before it opened, never locks at all.
+  const from = item.kind === 'window' ? day.items[0].start : item.start;
+  const counts = (at) => Number.isFinite(at) && at >= from && at < day.ends && at <= now
     && ((item.kind === 'window' && at < since) || at >= doneAfter);
   const proofs = Object.fromEntries(item.until.filter((proof) => proof !== 'done'
     && counts(status?.proofs?.[proof]?.at)).map((proof) => [proof, status.proofs[proof]]));
