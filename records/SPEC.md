@@ -66,9 +66,11 @@ flash-and-chime when an item ends.
   or its unlock time as HH:MM in the routine's timezone. Errors retain
   their JSON shape and status.
 - `POST /api/routine/proof {proof, note?}` records a private `wake`, `photo`, or
-  `away` proof for the current keepout that needs it, or an open keepout window.
-  Optional `day` and `key` together select an item explicitly. Proofs follow
-  Done's timing and action-order rules; retries preserve the first timestamp
+  `away` proof for the current keepout that needs it, else the open keepout
+  window, else the next one to open. Optional `day` and `key` together select
+  an item explicitly. A window takes proofs before or while it is open, which
+  finishes it before it locks; once locked, proofs follow Done's timing and
+  action-order rules. Retries preserve the first timestamp
   and note (up to 200 characters). The response includes the updated item and
   keepout. All required proofs complete an item; an `until done` condition
   still requires the button, which works only once the item's other proofs
@@ -76,8 +78,8 @@ flash-and-chime when an item ends.
   `until done` condition (`not_needed`); a Done recorded before that rule
   still counts.
   `GET /api/routine` exposes item `proofs`; keepout JSON adds `have` alongside
-  the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds an eligible
-  `item` (key, window start/end, required away minutes), or null when blocked,
+  the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds `item`: where
+  a bare proof would go (key, window start/end, required away minutes), or null when blocked,
   completed, opted out, or on a day off. Collectors count away time from that
   window's start and post with its day/key. Proofs retain today's and yesterday's
   progress only.
