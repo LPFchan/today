@@ -20,6 +20,16 @@ is refused as not due.
 With no limit, a second photo right after lunch would finish dinner hours
 ahead.
 
+## Options Considered
+
+### No limit
+
+- Simplest, but one photo could finish a meal hours ahead.
+
+### Within the hour before it opens (chosen)
+
+- Covers eating a little early; the next meal stays owed.
+
 ## Rationale
 
 An hour covers eating a little early without letting one meal stand in for
