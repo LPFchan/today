@@ -25,6 +25,9 @@ sunset-02:30 free time
 const MINUTE = 60_000;
 // A window takes its proofs up to this long before it opens.
 export const EARLY_MS = 60 * MINUTE;
+
+/** The earliest moment an item takes its proofs. */
+export const proofsFrom = (item) => (item.kind === 'window' ? item.start - EARLY_MS : item.start);
 const DAY = 1440;
 const TIME = '(?:\\d{1,2}:\\d{2}|sunset(?:[+-]\\d+(?:h(?:\\d+m)?|m))?)';
 const WHEN = new RegExp(`^(${TIME})(?:(\\.\\.|-)(${TIME}))?$`);
@@ -334,7 +337,7 @@ export function progress(day, item, status, now) {
   const since = item.kind === 'window' ? Math.min(startedAt ?? item.end, item.end) : item.start;
   const doneAfter = since + item.minMinutes * MINUTE;
   // A window finished before it locked, even just before it opened, never locks at all.
-  const from = item.kind === 'window' ? item.start - EARLY_MS : item.start;
+  const from = proofsFrom(item);
   const counts = (at) => Number.isFinite(at) && at >= from && at < day.ends && at <= now
     && ((item.kind === 'window' && at < since) || at >= doneAfter);
   const proofs = Object.fromEntries(item.until.filter((proof) => proof !== 'done'

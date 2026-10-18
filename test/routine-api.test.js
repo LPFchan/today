@@ -1096,7 +1096,8 @@ test('proof collectors see only an eligible item and its window', async (t) => {
   assert.equal((await call('GET', '/api/keepout?proof=away')).body.item, null);
   await proofCall(call, 'wake');
   const item = (await call('GET', '/api/keepout?proof=away')).body.item;
-  assert.deepEqual(item, { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'), awayMinutes: 30 });
+  assert.deepEqual(item, { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'),
+    from: instant('11:30'), awayMinutes: 30 });
   at('14:00');
   assert.deepEqual((await call('GET', '/api/keepout?proof=away')).body.item, item);
   await proofCall(call, 'away');
@@ -1175,7 +1176,8 @@ test('a meal can be logged before its window opens and then never locks', async 
   assert.equal((await proofCall(call, 'wake')).status, 200);
   at('12:13');
   assert.deepEqual((await call('GET', '/api/keepout?proof=photo')).body.item,
-    { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'), awayMinutes: null });
+    { key: '12:30..14:00', start: instant('12:30'), end: instant('14:00'),
+      from: instant('11:30'), awayMinutes: null });
   const early = await proofCall(call, 'photo', { note: 'leftover chicken' });
   assert.equal(early.status, 200);
   assert.equal(early.body.item.key, '12:30..14:00');
