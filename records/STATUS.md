@@ -35,6 +35,9 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 
 ## Recent Changes To Project Reality
 
+- 2026-10-18:
+  - Change: `GET /api/keepout?proof=` items carry `from`, the earliest moment they take that proof (PR #35, `b92e5a0`, Worker `255422fd`).
+  - Why it matters: brief refused a 12:01 lunch photo because it still waited for the window's start; it can now follow Today's hour lead without keeping its own copy.
 - 2026-10-16:
   - Change: early meal logging now opens only an hour before a meal; a photo sent further ahead is refused or goes to a window that is due (PR #34, `74d99c3`, Worker `ab6d82bf`, DEC-20261016-002).
   - Why it matters: with no limit, a photo right after lunch would have finished dinner.
