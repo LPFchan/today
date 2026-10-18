@@ -8,6 +8,9 @@
 //
 //   /api/watch  api     — the watch's hub-issued access token, or a browser session
 //   /api/board  api     — the same, for the Mac app, or a browser session
+//   /api/me, /api/schedule, /api/visibility
+//               api     — a today-scoped token from any client the owner
+//                         consented to, or a browser session (GET me, PUT the rest)
 //   /           oauth   — everything else, browser session only
 //                         (including /api/routine, /api/routine/start,
 //                          /api/routine/done, /api/keepout and /download/mac)

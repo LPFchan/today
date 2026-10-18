@@ -104,9 +104,12 @@ flash-and-chime when an item ends.
   deadline misses after late completion and distinguish bypass, skip_day, off and recovery.
 - `PUT /api/routine/away {day, away, reason}` sets days off only after the current
   routine day; `GET /api/routine` lists days off from the current day onward.
-- The watch and the Mac app cannot edit anything. They hold hub-issued OAuth
-  tokens for resource `https://today.lost.plus/mcp`, scope `today`; the
-  gateway accepts those only on `/api/watch` and `/api/board`.
+- Hub-issued OAuth tokens for resource `https://today.lost.plus/mcp`, scope
+  `today`, reach only the routes the gateway lists for that scope: reading
+  `/api/watch`, `/api/board`, `/api/keepout` and `/api/routine/report`, the
+  routine actions, days off, and the owner's own profile (`GET /api/me`,
+  `PUT /api/schedule`, `PUT /api/visibility`). The watch and the Mac app never
+  edit the schedule or visibility; any client the owner consents to may.
 - Drafts in the browser are keyed by the signed-in subject.
 
 ## Non-goals
