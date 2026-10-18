@@ -79,7 +79,8 @@ flash-and-chime when an item ends.
   still counts.
   `GET /api/routine` exposes item `proofs`; keepout JSON adds `have` alongside
   the full `needs` list. `GET /api/keepout?proof=away|photo|wake` adds `item`: where
-  a bare proof would go (key, window start/end, required away minutes), or null when blocked,
+  a bare proof would go (key, window start/end, `from`: the earliest moment it takes
+  that proof, required away minutes), or null when blocked,
   completed, opted out, or on a day off. Collectors count away time from that
   window's start and post with its day/key. Proofs retain today's and yesterday's
   progress only.

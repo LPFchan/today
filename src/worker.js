@@ -17,8 +17,8 @@
 import { identityFrom } from '@lpfchan/gateway-identity';
 import { ScheduleError, absoluteItems, parseSchedule, serializeSchedule } from '../public/schedule.js';
 import {
-  DEFAULT_PLACE, DEFAULT_ROUTINE, EARLY_MS, RoutineError, itemPhase, keepoutState, remainingNeeds,
-  parseRoutine, placeRoutine, progress, reportInstance, routineDay, routineSchedule, zonedDate,
+  DEFAULT_PLACE, DEFAULT_ROUTINE, RoutineError, itemPhase, keepoutState, remainingNeeds,
+  parseRoutine, placeRoutine, progress, proofsFrom, reportInstance, routineDay, routineSchedule, zonedDate,
 } from '../public/routine.js';
 
 const DAY_MS = 24 * 60 * 60_000;
@@ -116,7 +116,8 @@ async function api(request, env, url) {
         if (!['wake', 'photo', 'away'].includes(proof)) return json(400, { error: 'bad_request' });
         const item = proofItem(routine, proof, now);
         result.item = item && !Object.hasOwn(progress(routine.day, item, routine.statuses[item.key], now).proofs, proof)
-          ? { key: item.key, start: item.start, end: item.end, awayMinutes: item.awayMinutes } : null;
+          ? { key: item.key, start: item.start, end: item.end, from: proofsFrom(item),
+            awayMinutes: item.awayMinutes } : null;
       }
       // Hermes can skip an open window early, before it becomes a lock.
       if (url.searchParams.has('open')) {
@@ -686,7 +687,7 @@ function proofItem(routine, proof, now) {
 /** The open keepout window taking this proof, else one opening within the hour. */
 function nextWindow(routine, proof, now) {
   const window = (phase) => routine.day.items.find((item) => item.keepout && item.kind === 'window'
-    && item.until.includes(proof) && now >= item.start - EARLY_MS
+    && item.until.includes(proof) && now >= proofsFrom(item)
     && itemPhase(routine.day, item, routine.statuses[item.key], now) === phase);
   return window('open') ?? window('upcoming') ?? null;
 }
@@ -724,7 +725,7 @@ async function routineProof(request, env, me) {
   const phase = itemPhase(routine.day, item, status, now);
   // A window takes its proofs while open or within the hour before, so it never locks.
   const early = item.kind === 'window' && (phase === 'open'
-    || (phase === 'upcoming' && now >= item.start - EARLY_MS));
+    || (phase === 'upcoming' && now >= proofsFrom(item)));
   if (phase !== 'locked' && !early) return json(409, { error: 'not_due' });
   if (!early && now < p.doneAfter) return json(409, { error: 'too_soon' });
   // Merge in SQL so simultaneous different proofs cannot overwrite each other.
