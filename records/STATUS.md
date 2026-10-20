@@ -35,6 +35,9 @@ full sign-in with an account hasn't happened yet. The gateway accepts the
 
 ## Recent Changes To Project Reality
 
+- 2026-10-20:
+  - Change: the web timer page follows the Mac overlay: I'm up and snooze on wake locks, Next under a lock, padlock times in the Today list, and an N of M done count (PR #36, `3c90670`, Worker `09a2b188`).
+  - Why it matters: the web and the Mac app now offer the same keepout actions instead of feeling like two separate halves.
 - 2026-10-18:
   - Change: `GET /api/keepout?proof=` items carry `from`, the earliest moment they take that proof (PR #35, `b92e5a0`, Worker `255422fd`).
   - Why it matters: brief refused a 12:01 lunch photo because it still waited for the window's start; it can now follow Today's hour lead without keeping its own copy.
