@@ -60,7 +60,15 @@
           <h1 class="task-name" id="taskName"></h1>
           <time class="timer" id="timer" aria-live="off"><span aria-hidden="true">00:00</span></time>
           <p class="next-line" id="nextLine"></p>
-          <button class="btn primary keepout-done" id="keepoutDone" type="button" hidden></button>
+          <button class="btn primary keepout-action" id="keepoutAction" type="button" hidden></button>
+          <p class="keepout-snooze" id="keepoutSnooze" hidden>
+            <span data-t="routineSnoozeLabel">Snooze</span>
+            <button type="button" data-minutes="5"></button>
+            <button type="button" data-minutes="30"></button>
+            <button type="button" data-minutes="60"></button>
+          </p>
+          <p class="keepout-snoozed" id="keepoutSnoozed" hidden></p>
+          <p class="lock-next" id="lockNext" hidden></p>
           <div class="day-progress" id="dayProgress">
             <div class="progress-track" id="progressTrack" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
               <div class="progress-fill" id="progressFill"></div>
@@ -76,6 +84,7 @@
         <section class="agenda" id="agendaSection" aria-labelledby="agendaTitle" hidden>
           <div class="agenda-head">
             <h2 class="section-label" id="agendaTitle" data-t="today">Today</h2>
+            <span class="agenda-count" id="agendaCount"></span>
             <button class="btn quiet" id="editButton" type="button">
               <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" /></svg>
               <span data-t="edit">Edit</span>

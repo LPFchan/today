@@ -169,8 +169,16 @@ async function profile(env, me) {
     routineEnabled: Boolean(routine.row?.enabled),
     schedule: row.schedule ? { text: row.schedule, anchor: row.anchor } : null,
   };
-  // Your own lock, so the timer page can offer Done the way the Mac overlay does.
-  if (routine.today) Object.assign(result, { routineDay: routine.today.day, keepout: routine.today.keepout });
+  // Your own lock, so the timer page can offer Done the way the Mac overlay does,
+  // and when each item locks, in the order of the schedule's items.
+  if (routine.today) {
+    const locks = boardLocks(routine.today);
+    Object.assign(result, {
+      routineDay: routine.today.day,
+      keepout: routine.today.keepout,
+      locks: itemsOf(row).map((item) => locks.get(lockKey(item))?.shift() ?? null),
+    });
+  }
   return result;
 }
 
@@ -779,7 +787,7 @@ async function board(env, me) {
       me: row.sub === me.sub,
       visibility: row.visibility,
       items: !current ? [] : locks ? items.map((item) => {
-        const lock = locks.get(`${item.start} ${item.end} ${item.name}`)?.shift();
+        const lock = locks.get(lockKey(item))?.shift();
         return lock == null ? item : { ...item, lock };
       }) : items,
     });
@@ -795,12 +803,16 @@ async function board(env, me) {
 function boardLocks(today) {
   const locks = new Map();
   for (const item of today?.items ?? []) {
-    const key = `${item.start} ${item.end} ${item.name}`;
+    const key = lockKey(item);
     const owed = item.keepout && !['bypassed', 'done', 'past'].includes(item.phase);
     if (!locks.has(key)) locks.set(key, []);
     locks.get(key).push(owed ? (item.kind === 'window' ? item.end : item.start) : null);
   }
   return locks;
+}
+
+function lockKey(item) {
+  return `${item.start} ${item.end} ${item.name}`;
 }
 
 /** The caller's schedule for the watch: [startSec, endSec, name] rows. */

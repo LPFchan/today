@@ -500,17 +500,63 @@ main[aria-busy='true'] {
   overflow-wrap: anywhere;
 }
 
-.keepout-done {
+.keepout-action {
   min-width: 140px;
   font-variant-numeric: tabular-nums;
 }
 
-.keepout-done[hidden] {
+.keepout-action[hidden],
+.keepout-snooze[hidden] {
   display: none;
 }
 
-.keepout-done:disabled {
+.keepout-action:disabled,
+.keepout-snooze button:disabled {
   cursor: not-allowed;
+}
+
+/* One quiet line: the alarm can wait, the lock can't. */
+.keepout-snooze {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: baseline;
+  gap: 4px;
+  margin: 14px 0 0;
+  color: var(--text-meta);
+  font-size: 14px;
+}
+
+.keepout-snooze button {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.keepout-snooze button:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.keepout-snoozed {
+  margin: 12px 0 0;
+  color: var(--text-muted);
+}
+
+.lock-next {
+  margin: 18px 0 0;
+  color: var(--text-meta);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.lock-next[hidden],
+.day-progress[hidden] {
+  display: none;
 }
 
 .day-progress {
@@ -599,6 +645,38 @@ main[aria-busy='true'] {
 }
 
 .agenda-state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text-meta);
+  font-size: 12px;
+}
+
+.agenda-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+
+.agenda-lock svg {
+  width: 11px;
+  height: 11px;
+}
+
+.agenda-lock rect {
+  fill: currentColor;
+}
+
+.agenda-lock path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+}
+
+.agenda-count {
+  margin-right: auto;
+  margin-left: 10px;
   color: var(--text-meta);
   font-size: 12px;
 }
@@ -1880,12 +1958,16 @@ body.is-flashing .focus > * {
     min-width: 0;
   }
 
-  .agenda-list li,
   .person-detail li {
     grid-template-columns: 6.8rem minmax(0, 1fr);
   }
 
-  .agenda-state {
+  /* The row's highlight says Now and Done; the lock still shows. */
+  .agenda-list li {
+    grid-template-columns: 6.8rem minmax(0, 1fr) auto;
+  }
+
+  .agenda-status {
     display: none;
   }
 }
