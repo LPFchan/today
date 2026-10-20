@@ -367,8 +367,8 @@ function renderLock(lock, now) {
     const seconds = Math.ceil(left / 1000);
     setTimer(countdown(seconds), t('timeLeft', { duration: spokenDuration(seconds) }));
   }
-  // When the button below is all it takes, it says so itself.
-  const buttonOnly = needs.every((need) => need === 'wake' || need === 'done');
+  // When one press of the button below is all it takes, it says so itself.
+  const buttonOnly = needs.length === 1 && (needs[0] === 'wake' || needs[0] === 'done');
   el.nextLine.textContent = needs.length ? (buttonOnly ? '' : unlockSentence(needs))
     : lock.until !== null ? t('routineUnlockAt', { time: clock(lock.until) })
       : t('routineWaitingUnlock');
