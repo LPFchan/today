@@ -1086,6 +1086,8 @@ test('routine materialization preserves moments in the profile, board and watch 
   assert.equal(board.length, 8);
   assert.deepEqual(board[0], { start: instant('12:00'), end: instant('12:00'), name: 'wake up', lock: instant('12:00') });
   assert.deepEqual(board[1], { start: instant('12:00'), end: instant('12:30'), name: 'wash face, brush teeth', lock: instant('12:00') });
+  // The timer page gets the same lock times, one per schedule item.
+  assert.deepEqual(profile.locks, board.map((item) => item.lock ?? null));
 });
 
 test('proof collectors see only an eligible item and its window', async (t) => {

@@ -57,8 +57,10 @@ flash-and-chime when an item ends.
   difference anywhere. Keepout state and progress are private to their
   owner; the board shows others only the plan, and your own items carry
   when each still-owed keepout locks (`lock`, epoch ms).
-- With auto-routine on, `GET /api/me` adds `routineDay` and `keepout` (your
-  current lock or null), the same lock `GET /api/keepout` reports.
+- With auto-routine on, `GET /api/me` adds `routineDay`, `keepout` (your
+  current lock or null), the same lock `GET /api/keepout` reports, and
+  `locks`, the board's `lock` for each schedule item in order (null when it
+  won't lock).
 - `GET /api/keepout` defaults to JSON (`now`, `day`, `keepout`). With
   `Accept: text/plain`, it returns 200 with `text/plain; charset=utf-8`:
   an empty body when free, or one newline-terminated `today keepout:` line

@@ -16,7 +16,12 @@ const el = {
   taskName: $('#taskName'),
   timer: $('#timer'),
   nextLine: $('#nextLine'),
-  keepoutDone: $('#keepoutDone'),
+  keepoutAction: $('#keepoutAction'),
+  keepoutSnooze: $('#keepoutSnooze'),
+  keepoutSnoozed: $('#keepoutSnoozed'),
+  lockNext: $('#lockNext'),
+  agendaCount: $('#agendaCount'),
+  dayProgress: $('#dayProgress'),
   progressTrack: $('#progressTrack'),
   progressFill: $('#progressFill'),
   progressText: $('#progressText'),
@@ -71,7 +76,7 @@ const state = {
   routineEnabled: null, // unknown until the signed-in profile is read
   routineDay: null, // the auto-routine day the lock below belongs to
   keepout: null, // my current auto-routine lock, if any
-  markingDone: false,
+  sendingKeepout: false, // a Done, I'm up or snooze is in flight
   savingPlan: false,
   schedule: null, // { text, anchor }
   items: [], // absolute items of my schedule
@@ -167,7 +172,11 @@ function applyProfile(profile) {
   state.routineDay = profile.routineDay ?? null;
   state.keepout = profile.keepout ?? null;
   state.schedule = profile.schedule;
-  state.items = profile.schedule ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor) : [];
+  // `locks` holds when each of my items locks, in order, while auto-routine is on.
+  state.items = profile.schedule
+    ? absoluteItems(parseSchedule(profile.schedule.text), profile.schedule.anchor)
+      .map((item, index) => ({ ...item, lock: profile.locks?.[index] ?? null }))
+    : [];
   if (!samePlan) state.completed = null;
   if (switched) location.reload();
   renderAccount();
@@ -281,7 +290,7 @@ function renderMine(forceList = false) {
   }
   state.completed = day.completed;
   state.lastIndex = day.index;
-  renderKeepoutDone(now);
+  renderKeepoutActions(now);
 
   const lock = state.keepout;
   const empty = day.kind === 'empty' && !lock;
@@ -308,6 +317,9 @@ function renderMine(forceList = false) {
 
   // A lock outranks the plan: a window that ran out is still owed after its
   // row ends, so show what holds you and what lifts it, like the Mac overlay.
+  // The Mac overlay has no day bar, so the next item takes its place.
+  el.lockNext.hidden = !lock;
+  el.dayProgress.hidden = Boolean(lock);
   if (lock) {
     renderLock(lock, now);
     if (listChanged) renderAgenda(day);
@@ -355,40 +367,73 @@ function renderLock(lock, now) {
     const seconds = Math.ceil(left / 1000);
     setTimer(countdown(seconds), t('timeLeft', { duration: spokenDuration(seconds) }));
   }
-  el.nextLine.textContent = needs.length ? unlockSentence(needs)
+  // When one press of the button below is all it takes, it says so itself.
+  const buttonOnly = needs.length === 1 && (needs[0] === 'wake' || needs[0] === 'done');
+  el.nextLine.textContent = needs.length ? (buttonOnly ? '' : unlockSentence(needs))
     : lock.until !== null ? t('routineUnlockAt', { time: clock(lock.until) })
       : t('routineWaitingUnlock');
+  // What comes after, like the foot of the Mac overlay.
+  const next = state.items.find((item) => item.start > now);
+  el.lockNext.textContent = next ? t('nextAt', { time: clock(next.start), name: next.name }) : '';
   document.title = `${t('routineKeepoutActive')} · ${lock.name}`;
 }
 
-// Like the Mac overlay: Done shows once it's all a lock still needs.
-function renderKeepoutDone(now) {
+// Like the Mac overlay: I'm up and snooze while the wake proof is owed,
+// Done once it's all a lock still needs.
+function renderKeepoutActions(now) {
   const lock = state.keepout;
-  const show = Boolean(lock) && remainingNeeds(lock).join() === 'done';
-  el.keepoutDone.hidden = !show;
+  const needs = lock ? remainingNeeds(lock) : [];
+  const wake = needs.includes('wake');
+  const show = wake || needs.join() === 'done';
+  // Snoozing quiets the Mac's alarm, not the lock; it shows when it rings again.
+  const snoozed = wake && lock.snoozedUntil > now;
+  el.keepoutAction.hidden = !show;
+  el.keepoutSnooze.hidden = !wake || snoozed;
+  el.keepoutSnoozed.hidden = !snoozed;
   if (!show) return;
-  // The countdown reaching zero is enough; the server checks again on Done.
+  if (snoozed) el.keepoutSnoozed.textContent = t('routineSnoozedUntil', { time: clock(lock.snoozedUntil) });
+  for (const button of el.keepoutSnooze.querySelectorAll('button')) {
+    button.textContent = t('routineSnoozeMinutes', { minutes: button.dataset.minutes });
+    button.ariaLabel = t('routineSnooze', { minutes: button.dataset.minutes });
+    button.disabled = state.sendingKeepout;
+  }
+  // The countdown reaching zero is enough; the server checks again.
   const seconds = Math.max(0, Math.ceil((lock.doneAfter - now) / 1000));
-  el.keepoutDone.disabled = state.markingDone || seconds > 0;
-  el.keepoutDone.textContent = seconds > 0
-    ? t('routineDoneIn', { left: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` })
-    : t('done');
-  el.keepoutDone.setAttribute('aria-label', t('routineDoneItem', { name: lock.name }));
+  el.keepoutAction.disabled = state.sendingKeepout || seconds > 0;
+  if (wake) {
+    el.keepoutAction.textContent = t('routineWake');
+    el.keepoutAction.removeAttribute('aria-label');
+  } else {
+    el.keepoutAction.textContent = seconds > 0
+      ? t('routineDoneIn', { left: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}` })
+      : t('done');
+    el.keepoutAction.setAttribute('aria-label', t('routineDoneItem', { name: lock.name }));
+  }
 }
 
-async function markDone() {
-  const lock = state.keepout;
-  if (!lock || state.markingDone) return;
-  state.markingDone = true;
-  renderKeepoutDone(Date.now());
+/** Post an action on the shown lock, then re-read the lock. */
+async function sendKeepout(path, body) {
+  if (state.sendingKeepout) return;
+  state.sendingKeepout = true;
+  renderKeepoutActions(Date.now());
   try {
-    await request('POST', '/api/routine/done', { day: state.routineDay, key: lock.key });
+    await request('POST', path, body);
   } catch (error) {
     showToast(error.message);
   }
-  state.markingDone = false;
+  state.sendingKeepout = false;
   await loadProfile().catch(() => {});
-  renderKeepoutDone(Date.now());
+  renderKeepoutActions(Date.now());
+}
+
+function keepoutAction() {
+  const lock = state.keepout;
+  if (!lock) return;
+  if (remainingNeeds(lock).includes('wake')) {
+    sendKeepout('/api/routine/proof', { proof: 'wake', note: 'web', day: state.routineDay, key: lock.key });
+  } else {
+    sendKeepout('/api/routine/done', { day: state.routineDay, key: lock.key });
+  }
 }
 
 function renderAgenda(day) {
@@ -405,12 +450,29 @@ function renderAgenda(day) {
         textContent: timeRange(item, clock),
       }),
       Object.assign(document.createElement('span'), { className: 'agenda-name', textContent: item.name }),
-      Object.assign(document.createElement('span'), { className: 'agenda-state', textContent: status }),
+      agendaState(item, status),
     );
     if (isNow) li.setAttribute('aria-current', 'step');
     return li;
   });
   el.agendaList.replaceChildren(...rows);
+  el.agendaCount.textContent = t('doneCount', { done: day.completed, total: state.items.length });
+}
+
+/** The row's status, then a lock and its time on items that still lock. */
+function agendaState(item, status) {
+  const span = Object.assign(document.createElement('span'), { className: 'agenda-state' });
+  if (status) span.append(Object.assign(document.createElement('span'), { className: 'agenda-status', textContent: status }));
+  if (item.lock !== null) {
+    const lock = Object.assign(document.createElement('span'), { className: 'agenda-lock' });
+    lock.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>';
+    lock.append(
+      Object.assign(document.createElement('span'), { ariaHidden: 'true', textContent: clock(item.lock) }),
+      Object.assign(document.createElement('span'), { className: 'sr-only', textContent: t('lockFrom', { time: clock(item.lock) }) }),
+    );
+    span.append(lock);
+  }
+  return span;
 }
 
 /* ---------- everyone ---------- */
@@ -898,7 +960,11 @@ el.planInput.addEventListener('keydown', (event) => {
   }
 });
 el.clearButton.addEventListener('click', clearPlan);
-el.keepoutDone.addEventListener('click', markDone);
+el.keepoutAction.addEventListener('click', keepoutAction);
+el.keepoutSnooze.addEventListener('click', (event) => {
+  const minutes = Number(event.target.closest('button')?.dataset.minutes);
+  if (minutes && state.keepout) sendKeepout('/api/routine/snooze', { minutes });
+});
 el.editorForm.addEventListener('change', (event) => {
   if (event.target.name === 'visibility') setVisibility(event.target.value);
 });
