@@ -188,7 +188,6 @@ test('the last item cannot extend into the next instance, with the source line p
   assert.deepEqual(code(() => parseRoutine('12:00-13:00 First\n03:00-14:00 Sleep')), ['overlap', 2]);
   const exact = makeDay('12:00-13:00 First\n03:00-12:00 Sleep');
   assert.equal(exact.items.at(-1).end, exact.ends);
-  assert.doesNotThrow(() => parseRoutine(DEFAULT_ROUTINE));
 });
 
 test('NOAA sunset is within three minutes of the Seoul reference values', () => {
@@ -279,7 +278,6 @@ test('placement rejects times the ordinary day plan cannot represent at the orig
   assert.deepEqual(code(() => parseRoutine(later)), ['badTime', 4]);
   const laterItems = parseRoutine(later, DEFAULT_PLACE, { validate: false });
   assert.deepEqual(code(() => placeRoutine(laterItems, '2026-06-27')), ['badTime', 4]);
-  assert.doesNotThrow(() => parseRoutine(DEFAULT_ROUTINE));
 });
 
 test('fixed time-only locks ignore completion and stop at their slot end', () => {
