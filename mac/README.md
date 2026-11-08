@@ -77,8 +77,8 @@ open mac/build/Today.app --args --rehearse-first-launch   # replay onboarding
 
 `swift build --package-path mac && .build/debug/Today --snapshot DIR` (debug
 builds only) draws the onboarding steps, the panel and the menu bar item to
-PNGs with made-up plans. CI does this on every push that touches `mac/`
-(artifact `mac`).
+PNGs with made-up plans. CI does this only for `mac-v*` tags (artifact `mac`);
+`sh mac/scripts/test-keepout.sh` runs the keepout tests.
 
 Artwork: `swift mac/scripts/make-icon.swift` redraws `Resources/AppIcon.icns`
 from `public/icon.svg`'s shapes; `sh mac/scripts/make-dmg-background.sh`

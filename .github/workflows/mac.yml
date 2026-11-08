@@ -1,14 +1,12 @@
-# The Mac menu bar app (mac/). Every push that touches it builds the app and
-# snapshots its UI (artifact "mac"). A tag like mac-v1.2.0 also signs it,
-# publishes a GitHub release with Today.dmg, and adds it to the Sparkle feed
-# (appcast.xml on the mac-appcast branch).
+# The Mac menu bar app (mac/). A tag like mac-v1.2.0 builds and signs it,
+# snapshots its UI (artifact "mac"), publishes a GitHub release with Today.dmg,
+# and adds it to the Sparkle feed (appcast.xml on the mac-appcast branch).
+# Branch pushes don't run here; build and test on a Mac (mac/scripts/).
 name: mac
 
 on:
   push:
-    branches: ["**"]
     tags: ["mac-v*"]
-    paths: ["mac/**", ".github/workflows/mac.yml"]
 
 permissions:
   contents: write

@@ -43,7 +43,7 @@ npm run deploy    # wrangler deploy
 ```
 
 The watch app builds in CI (`.github/workflows/watch.yml`) and is attached to
-GitHub releases as `today.pbw`. The Mac app builds in CI too
-(`.github/workflows/mac.yml`); a `mac-v*` tag publishes `Today.dmg` and its
-Sparkle update. The site's download button offers both; `/download/mac`
+GitHub releases as `today.pbw`. A `mac-v*` tag builds the Mac app in CI
+(`.github/workflows/mac.yml`) and publishes `Today.dmg` and its Sparkle update;
+branch pushes build and test on a Mac instead. The site's download button offers both; `/download/mac`
 redirects to the newest DMG in the Sparkle feed.
