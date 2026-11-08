@@ -37,6 +37,15 @@ import Foundation
             _ = try JSONDecoder().decode(KeepoutReply.self, from: JSONSerialization.data(withJSONObject: present))
             fatalError("invalid proof shape decoded")
         } catch DecodingError.typeMismatch { }
+        let t = Date(timeIntervalSince1970: 100_000)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: true, locks: []) == 3)
+        precondition(KeepoutPoll.interval(now: t, active: true, urgent: false, locks: []) == 15)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: nil) == 15)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: []) == 60)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: [t + 121]) == 60)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: [t + 120]) == 15)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: [t - 300]) == 15)
+        precondition(KeepoutPoll.interval(now: t, active: false, urgent: false, locks: [t - 301]) == 60)
         print("Keepout compatibility and cache round-trip checks passed")
     }
 }

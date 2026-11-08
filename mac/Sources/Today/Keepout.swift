@@ -77,3 +77,18 @@ enum KeepoutStore {
 
     static func clear() { try? FileManager.default.removeItem(at: file) }
 }
+
+/// How often to ask the server about keepout. Every ask is a billed request
+/// through the gateway and the hub, so it is quick only when a lock is near:
+/// the board (refreshed every minute) says when each of your owed locks starts.
+enum KeepoutPoll {
+    /// `urgent`: a lock just ended and the cover waits for its successor, or the
+    /// wake alarm rings. `locks`: your owed lock times, nil before a board loads.
+    static func interval(now: Date, active: Bool, urgent: Bool, locks: [Date]?) -> TimeInterval {
+        if urgent { return 3 }
+        if active { return 15 }
+        guard let locks else { return 15 }
+        let near = locks.contains { (-300...120).contains($0.timeIntervalSince(now)) }
+        return near ? 15 : 60
+    }
+}

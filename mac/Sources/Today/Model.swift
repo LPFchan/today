@@ -191,7 +191,10 @@ final class Model {
             }
         }
         if now.timeIntervalSince(lastLoginTry) >= 15 { syncLoginItem() }
-        let keepoutInterval: TimeInterval = expiredKeepoutUntil == nil && wakeAlarm?.ringing != true ? 15 : 3
+        let keepoutInterval = KeepoutPoll.interval(
+            now: now, active: keepout != nil,
+            urgent: expiredKeepoutUntil != nil || wakeAlarm?.ringing == true,
+            locks: people.first { $0.me }.map { $0.items.compactMap(\.lock) })
         if now.timeIntervalSince(lastKeepoutTry) >= keepoutInterval { refreshKeepout() }
         // Plans change rarely; the timers run locally in between.
         if session == .signedIn, now.timeIntervalSince(lastTry) >= 60 { refresh() }
